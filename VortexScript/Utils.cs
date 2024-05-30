@@ -1,0 +1,153 @@
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+
+namespace Vortex
+{
+    class Utils
+    {
+        public static string RemoveInlineComments(string code)
+        {
+            string pattern = @"//.*";
+            return Regex.Replace(code, pattern, string.Empty);
+        }
+        public static string StringRemoveSpaces(string input)
+        {
+            StringBuilder result = new StringBuilder();
+            bool insideQuotes = false;
+
+            foreach (char c in input)
+            {
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    result.Append(c);
+                }
+                else if (c != ' ' || insideQuotes)
+                {
+                    result.Append(c);
+                }
+            }
+
+            return result.ToString();
+        }
+        public static bool StringContains(string input, string searchString)
+        {
+            bool insideQuotes = false;
+            int searchLength = searchString.Length;
+            int inputLength = input.Length;
+            int matchIndex = 0;
+
+            for (int i = 0; i < inputLength; i++)
+            {
+                char c = input[i];
+
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    continue;
+                }
+
+                if (!insideQuotes)
+                {
+                    if (c == searchString[matchIndex])
+                    {
+                        matchIndex++;
+                        if (matchIndex == searchLength)
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        matchIndex = 0; // Reset match index if the current character doesn't match
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public static int StringIndexOf(string input, string searchString)
+        {
+            bool insideQuotes = false;
+            int searchLength = searchString.Length;
+            int inputLength = input.Length;
+            int matchIndex = 0;
+
+            for (int i = 0; i < inputLength; i++)
+            {
+                char c = input[i];
+
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    continue;
+                }
+
+                if (!insideQuotes)
+                {
+                    if (c == searchString[matchIndex])
+                    {
+                        matchIndex++;
+                        if (matchIndex == searchLength)
+                        {
+                            return i - searchLength + 1; // Return the start index of the match
+                        }
+                    }
+                    else
+                    {
+                        i -= matchIndex; // Backtrack to re-check characters after a mismatch
+                        matchIndex = 0; // Reset match index if the current character doesn't match
+                    }
+                }
+            }
+
+            return -1; // Return -1 if the search string is not found
+        }
+
+
+        public static Dictionary<string, Variable> GetAllVars()
+        {
+            Dictionary<string, Variable> vars =[ ];
+            foreach (var Context in Interpreter.Instance.ScopeStack)
+            {
+                foreach (var kv in Context.Variables)
+                {
+                    vars.TryAdd(kv.Key, kv.Value);
+                }
+            }
+            return vars;
+        }
+        public static CustomAttributeTypedArgument GetStatementAttribute(MethodInfo statement, StatementAttributes index)
+        {
+            return statement.CustomAttributes.ToList()[0].ConstructorArguments[(int)index];
+        }
+        public static bool IsIdentifierValid(string identifier)
+        {
+            string pattern = @"^[a-zA-Z_][a-zA-Z0-9_]*$";
+            Regex regex = new(pattern);
+            return regex.IsMatch(identifier);
+        }
+        public static object CastToCSharpType(DataType type,string value){
+            return type switch
+            {
+                DataType.String => value,
+                DataType.Number => double.Parse(value),
+                DataType.Bool => value == "True",
+                DataType.Unset => null,
+                DataType.Int => 0,
+                _ => null,
+            };
+        }
+
+
+        public static void Swap<T>(IList<T> list, int indexA, int indexB)
+        {
+            (list[indexB], list[indexA]) = (list[indexA], list[indexB]);
+        }
+    }
+
+
+
+}

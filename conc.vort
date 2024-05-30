@@ -1,0 +1,16 @@
+#Hello //set module name, when omitted file name will be used
+// Declare
+$var = 5
+
+Console.print() //module . property call
+
+//statement
+if $var == 7 :
+    Console.print("It is")
+    if blah :
+        fef
+    ;
+else :
+    Console.print("It ain't")
+;
+

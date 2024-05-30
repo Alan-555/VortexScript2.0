@@ -1,0 +1,633 @@
+using System.Text;
+using Vortex;
+namespace Vorteval
+{
+    public class Evaluator
+    {
+        public static bool InitDone = false;
+        public static int HighestPrecedence = -1;
+
+        public static void Init()
+        {
+            if (InitDone) return;
+            InitDone = true;
+
+            foreach (var oper in OperatorFunctions)
+            {
+                if (!Operators.Contains(oper.Value.Oper))
+                {
+                    Operators = [.. Operators, oper.Value.Oper];
+                }
+                if (oper.Value.Priority > HighestPrecedence)
+                    HighestPrecedence = oper.Value.Priority;
+            }
+        }
+        Dictionary<string,Variable> localVars;
+
+        public Evaluator(Dictionary<string,Variable> localVars)
+        {
+            this.localVars = localVars;
+            Init();
+        }
+
+        const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+
+
+        public static readonly Dictionary<DataType, Type> CSharpDataRepresentations = new(){
+            {DataType.String,typeof(string)},
+            {DataType.Number,typeof(double)},
+            {DataType.Bool,typeof(bool)},
+            {DataType.None,typeof(object)},
+            {DataType.Any,typeof(object)},
+            {DataType.Int,typeof(int)},
+
+        };
+        public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
+            {DataType.String,TokenType.String},
+            {DataType.Number,TokenType.Number},
+            {DataType.Bool,TokenType.Bool},
+            {DataType.Unset,TokenType.Unset},
+
+        };
+        public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
+            {TokenType.String,DataType.String},
+            {TokenType.Number,DataType.Number},
+            {TokenType.Bool,DataType.Bool},
+            {TokenType.Unset,DataType.Unset},
+
+        };
+
+        public static readonly OperatorsDictiononary OperatorFunctions = new()
+        {
+            //unary
+            {"a§_", new("§",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
+            {"_!b", new("!",DataType.None,DataType.Bool,(a,b)=> !b,0,DataType.Bool,true)},
+            {"_-n", new("-",DataType.None,DataType.Number,(a,b)=> -b,0,DataType.Number,true)},
+            {"a??_", new("??",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
+            //multiplicative
+            { "n*n", new("*",DataType.Number, DataType.Number, (a, b) => a * b, 1,DataType.Number) },
+            { "n/n", new("/",DataType.Number, DataType.Number, (a, b) => a / b, 1,DataType.Number) },
+
+            //addative
+            { "n+n", new("+",DataType.Number, DataType.Number, (a, b) => a + b, 2,DataType.Number) },
+            { "n-n", new("-",DataType.Number, DataType.Number, (a, b) => a - b, 2,DataType.Number) },
+            { "n+s", new("+",DataType.Number, DataType.String, (a, b) => a.ToString() + b, 2) },
+            { "s+n", new("+",DataType.Number, DataType.String, (a, b) => a + b.ToString(), 2) },
+            { "s+s", new("+",DataType.String, DataType.String, (a, b) => a + b, 2) },
+
+            //compparative
+            {"n==n", new("==",DataType.Number, DataType.Number, (a,b) => a == b, 3,DataType.Bool) },
+            {"s==s", new("==",DataType.String, DataType.Number, (a,b) => a == b, 3,DataType.Bool) },
+            {"n==s", new("==",DataType.Number, DataType.String, (a,b) => a.ToString() == b, 3,DataType.Bool) },
+            {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 3,DataType.Bool) },
+            {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 3,DataType.Bool) },
+        };
+        public static string[] Operators = [];
+
+        public string originalExpression;
+
+        public Variable Evaluate(string expression)
+        {
+            originalExpression = expression;
+            if(expression==""){
+                throw new ExpressionEvalError(this,"Empty expression");
+            }
+            var tokens = Tokenize(expression);
+            return RecursiveEval(tokens);
+        }
+        Variable RecursiveEval(List<Token> tokens)
+        {
+            //proccess scopes
+            if (tokens.Any(x => x.type == TokenType.Scope))
+            {
+                var scopes = Scopify(tokens);
+                int dist = 0;
+                foreach (var scope in scopes)
+                {
+                    int start = scope.From - dist;
+                    int end = scope.To - dist;
+                    var expression = tokens[(start + 1)..end];
+                    var result = RecursiveEval(expression);
+                    tokens.RemoveRange(start, end - start + 1);
+                    tokens.Insert(start, new(DataTypeToToken[result.type], result.value.ToString()));
+                    dist = end - start;
+                }
+            }
+            //proccess variables
+            tokens = ProccessVariables(tokens);
+
+            //process operands and operators
+            for (int i = 0; i < HighestPrecedence + 1; i++)
+            {
+                while (true)
+                {
+                    bool modified = ProccessOperators(tokens, i, out var newTokens);
+                    if (modified)
+                    {
+                        tokens = newTokens;
+                    }
+                    else
+                        break;
+
+                }
+            }
+            if (tokens.Count != 1)
+            {
+                var e = new ExpressionEvalError(this, "Too many tokens apeared after proccessing. Are you missing an operator?");
+                e.info = TokensToExpression(tokens);
+                throw e;
+            }
+            var dataType = TokenToDataType[tokens[0].type];
+            var value_ = tokens[0].value;
+            var value = Utils.CastToCSharpType(dataType, value_);
+            return new(dataType,value); //TODO: cast
+        }
+        public List<Token> ProccessVariables(List<Token> tokens)
+        {
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].type == TokenType.Variable)
+                {
+                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable, localVars);
+                    if (!good)
+                    {
+                        throw new UnknownName(tokens[i].value);
+                    }
+                    tokens[i] = new(DataTypeToToken[variable.type], variable.value.ToString());
+                }
+                else if(tokens[i].type == TokenType.Console_in){
+                    var in_ = Console.ReadLine();
+                    if(in_=="")
+                        tokens[i] = new(TokenType.Unset,"");
+                    else
+                        tokens[i] = new(TokenType.String,in_);
+
+                }
+            }
+
+            return tokens;
+
+        }
+        public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)
+        {
+            int index = 0;
+            bool modified = false;
+            bool found = false;
+            Operator oper = new();
+            int leftI = 0, rightI = 0;
+            foreach (var token in tokens)
+            {
+                if (token.type == TokenType.Operator)
+                {
+                    found = true;
+                    leftI = index - 1;
+                    rightI = index + 1;
+                    char left = '_', right = '_';
+                    try
+                    {
+                        left = tokens[leftI].type.ToString().ToLower()[0];
+                        if(left=='o')
+                            left = '_';
+                    }
+                    catch { }
+                    try
+                    {
+                        right = tokens[rightI].type.ToString().ToLower()[0];
+                        if(right=='o')
+                            right = '_';
+                    }
+                    catch { }
+                    bool good = false;
+                    good = OperatorFunctions.TryGet(left + token.value + right, out oper);
+
+                    if (!good)
+                    {
+                        OperatorFunctions.TryGetAny(token.value, out oper);
+                        if (oper.Priority != priority)
+                        {
+                            index++;
+                            continue;
+                        }
+                        if (left != '_' && right != '_')
+                            throw new ExpressionEvalError(this, "Unknown operator: " + tokens[leftI].type.ToString() + token.value + tokens[rightI].type.ToString());
+                        else if (left != '_')
+                            throw new ExpressionEvalError(this, "Unknown operator: " + tokens[leftI].type.ToString() + token.value);
+                        else if (right != '_')
+                            throw new ExpressionEvalError(this, "Unknown operator: " + token.value + tokens[rightI].type.ToString());
+                        else
+                            throw new ExpressionEvalError(this, "No operands found for operator: " + token.value);
+
+
+                    }
+                    if (oper.Priority != priority)
+                    {
+                        index++;
+                        continue;
+                    }
+                    if (oper.Unary)
+                    {
+                        if (oper.IsBeofre)
+                        {
+                            if (right == '_')
+                            {
+                                throw new ExpressionEvalError(this, "Expected an operand after unary operator '"+oper.Oper+"'");
+                            }
+                        }
+                        else
+                        {
+                            if (left == '_')
+                            {
+                                throw new ExpressionEvalError(this, "Expected an operand before unary operator '"+oper.Oper+"'");
+                            }
+                        }
+                    }
+                    modified = true;
+                    break;
+
+                }
+
+                index++;
+            }
+            if (!found)
+            {
+                tokensOut = tokens;
+                return false;
+            }
+            if (modified)
+            {
+                if (oper.Unary)
+                {
+                    if(oper.Oper=="??"){
+                        var val1 = tokens[leftI];
+                        var result = val1.type != TokenType.Unset;
+                        tokens.RemoveRange(leftI, 2);
+                        tokens.Insert(leftI, new(TokenType.Bool, result.ToString()));
+                    }
+                    else
+                    if(oper.Oper=="§"){
+                        var val1 = tokens[leftI];
+                        var result = val1.type != TokenType.Unset;
+                        tokens.RemoveRange(leftI, 2);
+                        if(result)
+                            tokens.Insert(leftI, val1);
+                        else
+                            tokens.Insert(leftI, new(TokenType.String, ""));
+
+                    }
+                    else
+                    if (oper.IsBeofre)
+                    {
+                        var val2 = TokenToPrimitive(tokens[rightI]);
+                        var result = oper.Func(0, val2);
+                        tokens.RemoveRange(leftI + 1, 2);
+                        tokens.Insert(leftI + 1, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                    }
+                    else
+                    {
+                        var val1 = TokenToPrimitive(tokens[leftI]);
+                        var result = oper.Func(val1, 0);
+                        tokens.RemoveRange(leftI, 2);
+                        tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                    }
+                }
+                else
+                {
+                    var val1 = TokenToPrimitive(tokens[leftI]);
+                    var val2 = TokenToPrimitive(tokens[rightI]);
+                    var result = oper.Func(val1, val2);
+                    tokens.RemoveRange(leftI, rightI - leftI + 1);
+                    tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                }
+            }
+
+
+            tokensOut = tokens;
+            return modified;
+        }
+
+        public object TokenToPrimitive(Token token)
+        {
+            switch (token.type)
+            {
+                case TokenType.Number:
+                    return double.Parse(token.value);
+                case TokenType.String:
+                    return token.value;
+                case TokenType.Bool:
+                    return token.value == "True";
+                case TokenType.Unset:
+                    return null;
+                default:
+                    throw new ArgumentException("Token must be a value");
+            }
+        }
+
+        public string TokensToExpression(List<Token> tokens)
+        {
+            string expression = "";
+            foreach (Token token in tokens)
+            {
+                expression += token.value;
+            }
+            return expression;
+        }
+
+        public List<Token> Tokenize(string expression)
+        {
+            var tokens = new List<Token>();
+            var currentToken = new StringBuilder();
+            bool inString = false;
+            var operatorTest = "";
+            bool readingVar = false;
+
+            for (int i = 0; i < expression.Length; i++)
+            {
+                char c = expression[i];
+
+                if (inString)
+                {
+                    if (c == '"')
+                    {
+                        inString = false;
+                        tokens.Add(new Token(TokenType.String, currentToken.ToString()));
+                        currentToken.Clear();
+                    }
+                    else
+                    {
+                        currentToken.Append(c);
+                    }
+                    continue;
+                }
+                else if (c == ':'){
+                    tokens.Add(new(TokenType.Console_in,""));
+                }
+
+                else if (!(!readingVar && char.IsDigit(c)) && identifierValidChars.Contains(c))
+                {
+                    readingVar = true;
+                    currentToken.Append(c);
+                }
+                else
+
+                if (char.IsDigit(c) || (c == '.' && currentToken.Length > 0 && char.IsDigit(currentToken[currentToken.Length - 1])))
+                {
+                    currentToken.Append(c);
+                }
+                else
+                {
+                    if (currentToken.Length > 0)
+                    {
+                        if (readingVar)
+                        {
+                            tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
+                            readingVar = false;
+                        }
+                        else
+                        {
+                            tokens.Add(new Token(TokenType.Number, currentToken.ToString()));
+
+                        }
+                        currentToken.Clear();
+                    }
+                    bool isOperator = false;
+                    if (!inString)
+                    {
+                        operatorTest += c;
+                        foreach (var oper in OperatorFunctions)
+                        {
+                            if (oper.Value.Oper.StartsWith(operatorTest))
+                            {
+                                isOperator = true;
+                                break;
+                            }
+                        }
+                        if (Operators.Contains(operatorTest)&&!Operators.Any(x=>x.StartsWith(operatorTest+expression[i+1])))
+                        {
+                            tokens.Add(new(TokenType.Operator, operatorTest));
+                            operatorTest = "";
+                        }
+                    }
+                    if (isOperator)
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        operatorTest = "";
+                    }
+
+
+                    if (c == '(' || c == ')')
+                    {
+                        tokens.Add(new Token(TokenType.Scope, c.ToString()));
+                    }
+
+                    else if (c == '"')
+                    {
+                        inString = true;
+                    }
+                    else
+                    {
+                        throw new ExpressionEvalError(this, "Unexpected token '" + c + "'");
+                    }
+                }
+            }
+            if(operatorTest!=""){
+                throw new ExpressionEvalError(this,"Unknown operator "+operatorTest);
+            }
+            if (currentToken.Length > 0)
+            {
+                if (readingVar)
+                {
+                    tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
+                }
+                else
+                {
+                    tokens.Add(new Token(TokenType.Number, currentToken.ToString()));
+
+                }
+                currentToken.Clear();
+            }
+
+            return tokens;
+        }
+
+        public List<ExpressionScope> Scopify(List<Token> tokens)
+        {
+            List<ExpressionScope> scopes = new();
+            int depth = 0, start = -1, end = -1;
+            int i = 0;
+            foreach (var token in tokens)
+            {
+                if (token.type == TokenType.Scope)
+                {
+                    if (token.value == "(")
+                    {
+                        depth++;
+                        if (start == -1)
+                            start = i;
+                    }
+                    else
+                    if (token.value == ")")
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            end = i;
+                            scopes.Add(new(start, end));
+                            start = -1;
+                            end = -1;
+                        }
+                    }
+                }
+                i++;
+            }
+
+            return scopes;
+        }
+
+
+    }
+
+    public struct Token
+    {
+        public TokenType type;
+        public string value;
+
+        public Token(TokenType type, string value)
+        {
+            this.type = type;
+            this.value = value;
+        }
+    }
+    public struct Operator
+    {
+        public string Oper { get; }
+        public Type LeftType { get; }
+        public Type RightType { get; }
+        public Func<dynamic, dynamic, dynamic> Func { get; }
+        public int Priority { get; }
+        public DataType ResultType { get; }
+        public bool Unary { get; }
+        public bool IsBeofre { get; }
+
+        public Operator(string oper, DataType leftType, DataType rightType, Func<dynamic, dynamic, dynamic> func, int priority, DataType resultType = DataType.String, bool unary = false)
+        {
+            Oper = oper;
+            LeftType = Evaluator.CSharpDataRepresentations[leftType];
+            RightType = Evaluator.CSharpDataRepresentations[rightType];
+            Func = func;
+            Priority = priority;
+            ResultType = resultType;
+            Unary = unary;
+            IsBeofre = leftType == DataType.None;
+        }
+
+    }
+    public struct ExpressionScope(int from, int to)
+    {
+        public int From { get; } = from;
+        public int To { get; } = to;
+    }
+    public struct OperatorTask(int priority, Operator oper)
+    {
+        public int Priority { get; } = priority;
+        public Operator Oper { get; } = oper;
+    }
+    public enum TokenType
+    {
+        Number = 0, //1,5
+        Operator = 1, //+,-,*
+        Scope = 2, // ()
+        String = 3, // "blah"
+        Variable = 4, // i
+        Function = 5,
+        Bool = 6,
+        Unset = 7,
+        Console_in = 8,
+        Any = 9,
+        Int = 10,
+
+        Unknown = -1 //  some garbage
+    }
+
+    public class OperatorsDictiononary : Dictionary<string, Operator>
+    {
+        public bool TryGet(string key, out Operator result)
+        {
+            KeyValuePair<string, Operator> result_ = default;
+            if(key.Contains("??")){
+                result_ = new("a??_", new("??",DataType.Any,DataType.None,(a,b)=> a,0,DataType.Number,true));
+            }
+            else
+            if(key.Contains("§")){
+                result_ = new("a§_", new("§",DataType.Any,DataType.None,(a,b)=> a,0,DataType.Number,true));
+            }
+            else
+            if (key.Contains('_'))
+            {
+                if (key[0] == '_')
+                {
+                    try
+                    {
+                        result_ = this.First(x => x.Key.EndsWith(key[1..]));
+                        if (!result_.Key.Contains('_'))
+                            throw new Exception("Invalid wildcard");
+                    }
+                    catch
+                    {
+                        result_ = default;
+                    }
+                }
+                else
+                {
+                    try
+                    {
+                        result_ = this.First(x => x.Key.StartsWith(key[..^1]));
+                        if (!result_.Key.Contains('_'))
+                            throw new Exception("Invalid wildcard");
+                    }
+                    catch
+                    {
+                        result_ = default;
+                    }
+                }
+            }
+           
+            else
+            {
+                return base.TryGetValue(key, out result);
+            }
+            if (result_.Equals(default(KeyValuePair<string, Operator>)))
+            {
+                result = default;
+                return false;
+            }
+            result = result_.Value;
+            return true;
+        }
+
+        public bool TryGetAny(string key, out Operator result)
+        {
+            KeyValuePair<string, Operator> result_ = default;
+
+            try
+            {
+                result_ = this.First(x => x.Key.Contains(key));
+            }
+            catch
+            {
+                result_ = default;
+            }
+
+            if (result_.Equals(default(KeyValuePair<string, Operator>)))
+            {
+                result = default;
+                return false;
+            }
+            result = result_.Value;
+            return true;
+        }
+    }
+
+}
