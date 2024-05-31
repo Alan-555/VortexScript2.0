@@ -5,29 +5,29 @@ using CodingSeb.ExpressionEvaluator;
 namespace Vortex{
     public class Interpreter{
         //Internal stuff
-        MethodInfo[] statements;
+        static MethodInfo[] statements=[];
 
         //Memory
-        public string File {private set; get; }
+
+        public static Stack<VFrame> CallStack {get;private set;} = [];
+
+        public VFile File {private set; get; }
     
-        public Stack<Context> ScopeStack {get; private set;}
-
-        public int Line {private set; get; }
-
-        public static Interpreter Instance {get; private set;}
+        public VFrame FileFrame {private set; get; }
 
         public static Dictionary<string,Variable> SuperGlobals {get; private set;} = new(){
             {"true", new Variable(DataType.Bool,true)},
             {"false", new Variable(DataType.Bool,false)},
             {"unset",new Variable(DataType.Unset,"")},
         };
-        public Interpreter(string file){
-            Instance = this;
-            ScopeStack = new ();
+        public Interpreter(VFile file){
             File = file;
-            ScopeStack.Push(new Context([],0,ScopeTypeEnum.topLevel));
-            InitStatements();
-            ExecuteFile(FileReader.ReadFile(File));
+            File.FileInterpreter = this;
+            FileFrame = new(File,0);
+            CallStack.Push(FileFrame);
+            FileFrame.ScopeStack.Push(new VContext([],[],0,ScopeTypeEnum.topLevel));
+            if(statements.Length==0)
+                InitStatements();
         }
         
         public void InitStatements(){
@@ -36,12 +36,15 @@ namespace Vortex{
                       .Where(m => m.GetCustomAttributes(typeof(MarkStatement), false).Length > 0)
                       .ToArray();
         }
+        public void ExecuteFile(){
+            ExecuteFile(File.ReadFile());
+        }
 
-        public void ExecuteFile(string[] lines){
+         void ExecuteFile(string[] lines){
             foreach(string line in lines){
                 try{    
                     ExecuteLine(line);
-                    Line++;
+                    GetCurrentFrame().currentLine++;
                 }
                 catch (ExpressionEvalError e){
                     VortexError.ThrowError(e);
@@ -62,6 +65,9 @@ namespace Vortex{
         public void ExecuteLine(string line){
             line = Utils.RemoveInlineComments(line);
             line = line.Trim();
+            var func = GetCurrentContext().FuncBeingRead;
+            if(func!=null)
+                func.FunctionBody = [.. func.FunctionBody, line];
             ExecuteStatement(line);
 
         }
@@ -77,11 +83,14 @@ namespace Vortex{
             try{
             if(statementToExec == null){
                 //check for assignment
-                if(!AssignStatement(statement))
+                if(AssignStatement(statement))
+                    return;
+                else
+                if(!FuncDeclaration(statement))
                     throw new UnknownStatementError(statement);
                 else
                     return;
-                }
+            }
                 bool endsScope = (bool)Utils.GetStatementAttribute(statementToExec,StatementAttributes.endScope).Value!;
                 bool startsScope = (bool)Utils.GetStatementAttribute(statementToExec,StatementAttributes.mewScope).Value!;
                 //border statement
@@ -93,6 +102,7 @@ namespace Vortex{
                         }
                         CloseContext();
                         OpenNewContext(ScopeTypeEnum.elseScope);
+                        GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
                         if(context.SubsequentFramesIgnore){
                             GetCurrentContext().Ignore = true;
                             GetCurrentContext().SubsequentFramesIgnore = true;
@@ -107,6 +117,7 @@ namespace Vortex{
                         }
                         CloseContext();
                         OpenNewContext(ScopeTypeEnum.ifScope);
+                        GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
                         if(context.SubsequentFramesIgnore){
                             GetCurrentContext().Ignore = true;
                             GetCurrentContext().SubsequentFramesIgnore = true;
@@ -125,6 +136,8 @@ namespace Vortex{
                     OpenNewContext((ScopeTypeEnum)Utils.GetStatementAttribute(statementToExec,StatementAttributes.scopeType).Value!);
                     //inhirit igonre flag
                     GetCurrentContext().Ignore = prevContext.Ignore;
+                    //inhirit function
+                    GetCurrentContext().FuncBeingRead = prevContext.FuncBeingRead;
                     if(prevContext.Ignore){
                         GetCurrentContext().SubsequentFramesIgnore = true;
                     }
@@ -140,24 +153,38 @@ namespace Vortex{
             }
         }
 
-        public Context OpenNewContext(ScopeTypeEnum type){
-            var newC = new Context([],ScopeStack.Count,type,StartLine:Line);
-            ScopeStack.Push(newC);
+        public VContext OpenNewContext(ScopeTypeEnum type){
+
+            var newC = new VContext([], [],GetCurrentFrame().ScopeStack.Count,type,StartLine:GetCurrentFrame().currentLine);
+            GetCurrentFrame().ScopeStack.Push(newC);
             return newC;
         }
         public void CloseContext(){
-            ScopeStack.Pop();
+            if(GetCurrentContext().FuncBeingRead!=null&&GetCurrentContext().FuncTopLevel){
+                FinishFuncDeclaration();
+            }
+            else{
+                GetCurrentFrame().ScopeStack.Pop();
+
+            }
         }
-        public Context GetCurrentContext(){
-            return ScopeStack.First();
+
+        public void OpenNewFrame(VFile file,int lineSart){
+            var frame = new VFrame(file,lineSart);
+            CallStack.Push(frame);
+        }
+
+        public static VFrame GetCurrentFrame(){
+            return CallStack.First();
+        }
+        public static VContext GetCurrentContext(){
+            return GetCurrentFrame().ScopeStack.First();
         }
         public bool AssignStatement(string statement){
             if(Utils.StringContains(statement,"=")){
                 var middle = Utils.StringIndexOf(statement,"=");
                 if(middle<1){
-                    var e = new UnexpectedTokenError("=");
-                    e.info = "Identifier expected prior";
-                    throw e;
+                    throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
 
                 }
                 if(middle+1==statement.Length){
@@ -175,6 +202,50 @@ namespace Vortex{
                 }
             }
             return false;
+        }
+        public bool FuncDeclaration(string statement){
+            if(GetCurrentContext().FuncBeingRead!=null||GetCurrentContext().ScopeType!=ScopeTypeEnum.topLevel){
+                throw new IlegalDeclarationError("function").SetInfo("Functions may only be declared at the top level");
+            }
+            if(Utils.StringContains(statement,"(")&&Utils.StringContains(statement,")")&&statement.EndsWith(" :")){
+                int argsStart = Utils.StringIndexOf(statement,"(");
+                int argsEnd = Utils.StringIndexOf(statement,")");
+                if(argsStart==0){
+                   throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
+                }
+                else if (argsStart==-1){
+                    throw new ExpectedTokenError("(");
+                }
+                if(argsEnd==-1){
+                    throw new ExpectedTokenError(")");
+                }
+                string identifier = statement[0..statement.IndexOf('(')];
+                if(!Utils.IsIdentifierValid(identifier)){
+                    throw new InvalidIdentifierError(identifier);
+                }
+                string args = statement[(argsStart+1)..argsEnd];
+                var argsArray = args.Split(',');
+                List<VFuncArg> argsList = new List<VFuncArg>();
+                foreach (var arg in argsArray)
+                {
+                    argsList.Add(new(arg));
+                }
+                VFunc func = new(identifier,File, [.. argsList]);
+                var c = OpenNewContext(ScopeTypeEnum.functionScope);
+                c.Ignore = true;
+                c.SubsequentFramesIgnore = true;
+                c.FuncBeingRead = func;
+                c.FuncTopLevel = true;
+                return true;
+            }
+            return false;
+        }
+        public void FinishFuncDeclaration(){
+            var func = GetCurrentContext().FuncBeingRead;
+            func!.FunctionBody = func.FunctionBody[..^1];
+            GetCurrentFrame().ScopeStack.Pop();
+            GetCurrentContext().Functions.Add(func.Identifier,func);
+            
         }
         //
         [MarkStatement("$",false)]
@@ -235,7 +306,7 @@ namespace Vortex{
         }
         [MarkStatement(";",false,endsScope:true)]
         public void EndScopeStatement(string statement){
-
+            
         }
         [MarkStatement("else :",true,ScopeTypeEnum.elseScope,true)]
         public void ElseScopeStatement(string statement){
@@ -259,14 +330,14 @@ namespace Vortex{
         }
 
 
-        public static bool ReadVar(string identifier, out Variable val,Context? scope = null){
-            scope ??= Instance.GetCurrentContext();
-            var combined = scope.Variables.Concat(SuperGlobals).ToDictionary(x=>x.Key,x=>x.Value);
-            var res = combined.TryGetValue(identifier, out val);
-            if(!val.unsetable&&val.type==DataType.Unset)
-                throw new ReadingUnsetValue(identifier);
-            return res;
-        }
+        // public static bool ReadVar(string identifier, out Variable val,Context? scope = null){
+        //     scope ??= GetCurrentContext();
+        //     var combined = scope.Variables.Concat(SuperGlobals).ToDictionary(x=>x.Key,x=>x.Value);
+        //     var res = combined.TryGetValue(identifier, out val);
+        //     if(!val.unsetable&&val.type==DataType.Unset)
+        //         throw new ReadingUnsetValue(identifier);
+        //     return res;
+        // }
         public static bool ReadVar(string identifier, out Variable val,Dictionary<string,Variable> vars ){
             if(SuperGlobals.TryGetValue(identifier, out  val)){
                 return true;
@@ -276,10 +347,10 @@ namespace Vortex{
                 return false;
             }
             if(!val.unsetable&&val.type==DataType.Unset)
-                throw new ReadingUnsetValue(identifier);
+                throw new ReadingUnsetValueError(identifier);
             return res;
         }
-        public bool SetVar(string identifier, Variable value,Context? scope = null){
+        public bool SetVar(string identifier, Variable value,VContext? scope = null){
             scope ??= GetCurrentContext();
             if(scope.Variables.ContainsKey(identifier)){
                 scope.Variables[identifier] = value;

@@ -110,7 +110,7 @@ namespace Vortex
         public static Dictionary<string, Variable> GetAllVars()
         {
             Dictionary<string, Variable> vars =[ ];
-            foreach (var Context in Interpreter.Instance.ScopeStack)
+            foreach (var Context in Interpreter.GetCurrentFrame().ScopeStack)
             {
                 foreach (var kv in Context.Variables)
                 {

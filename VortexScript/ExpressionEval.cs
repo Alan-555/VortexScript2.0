@@ -52,7 +52,7 @@ namespace Vortex
             }*/
             if(requiredType!=DataType.None){
                 if(result.type!=requiredType){
-                    throw new UnmatchingDataType(result.type.ToString(),requiredType.ToString());
+                    throw new UnmatchingDataTypeError(result.type.ToString(),requiredType.ToString());
                 }
             }
             return result;

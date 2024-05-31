@@ -133,14 +133,12 @@ namespace Vorteval
             }
             if (tokens.Count != 1)
             {
-                var e = new ExpressionEvalError(this, "Too many tokens apeared after proccessing. Are you missing an operator?");
-                e.info = TokensToExpression(tokens);
-                throw e;
+                throw new ExpressionEvalError(this, "Too many tokens apeared after proccessing. Are you missing an operator?").SetInfo(TokensToExpression(tokens));
             }
             var dataType = TokenToDataType[tokens[0].type];
             var value_ = tokens[0].value;
             var value = Utils.CastToCSharpType(dataType, value_);
-            return new(dataType,value); //TODO: cast
+            return new(dataType,value);
         }
         public List<Token> ProccessVariables(List<Token> tokens)
         {
@@ -151,7 +149,7 @@ namespace Vorteval
                     bool good = Interpreter.ReadVar(tokens[i].value, out var variable, localVars);
                     if (!good)
                     {
-                        throw new UnknownName(tokens[i].value);
+                        throw new UnknownNameError(tokens[i].value);
                     }
                     tokens[i] = new(DataTypeToToken[variable.type], variable.value.ToString());
                 }
@@ -425,6 +423,9 @@ namespace Vorteval
                     else if (c == '"')
                     {
                         inString = true;
+                    }
+                    else if(c==' '){
+                        
                     }
                     else
                     {

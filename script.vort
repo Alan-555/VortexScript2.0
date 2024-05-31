@@ -1,2 +1,10 @@
-$x =5
-> 3/(x+2)
+callMe(a) :
+    > "Printed "+a
+    if a==5 :
+        > "Print a is 5"
+    else :
+        > "Print a is not 5"
+    ;
+;
+
+$x = 1

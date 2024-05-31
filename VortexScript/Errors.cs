@@ -13,13 +13,18 @@ namespace Vortex{
             this.message = string.Format(message,args);
         }
 
+        public VortexError SetInfo(string info){
+            this.info = info;
+            return this;
+        }
+
         public static void ThrowError(VortexError error){
             Console.WriteLine("A "+error.GetType().ToString()+" has occured!");
             Console.WriteLine(error.message+"\n\t"+error.info);
             if(ErrorHints.TryGetValue(error.info,out var val)){
                 Console.WriteLine("\t"+val);
             }
-            Console.WriteLine("In: "+Interpreter.Instance.File+":"+(Interpreter.Instance.Line+1));
+            Console.WriteLine("In: "+Interpreter.GetCurrentFrame().VFile.Path+":"+(Interpreter.GetCurrentFrame().currentLine+1));
             Console.WriteLine("Stack trace follows:");
             //TODO: stack trace
 
@@ -44,7 +49,8 @@ namespace Vortex{
     public class IlegalStatementContextError(params string[] args) : VortexError("The statement '{0}' is not valid in the current context. ({1})",args);
     public class ScopeLeakError(params string[] args) : VortexError("The scope that began on line {0} has leaked.",args);
     public class InvalidIdentifierError(params string[] args) : VortexError("The identifier '{0}' is not valid. Identifiers must begin with a letter or an '_', only letters, numbers and '_' are allowed and it musn't be a reserved keyword. ",args);
-    public class UnmatchingDataType(params string[] args) : VortexError("Unmatching data type. Could not convert from {0} to {1}",args);
-    public class UnknownName(params string[] args) : VortexError("The name {0} does not exist in the current context.",args);
-    public class ReadingUnsetValue(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$!' to allow for unset values)",args);
+    public class UnmatchingDataTypeError(params string[] args) : VortexError("Unmatching data type. Could not convert from {0} to {1}",args);
+    public class UnknownNameError(params string[] args) : VortexError("The name {0} does not exist in the current context.",args);
+    public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$!' to allow for unset values)",args);
+    public class IlegalDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.",args);
 }
