@@ -50,7 +50,7 @@ namespace Vortex
             catch(Exception e) {
                 throw new ExpressionEvalError("Unknown error has occured while evaluating expression '"+expression+"'");
             }*/
-            if(requiredType!=DataType.None){
+            if(requiredType!=DataType.None&&requiredType!=DataType.Any){
                 if(result.type!=requiredType){
                     throw new UnmatchingDataTypeError(result.type.ToString(),requiredType.ToString());
                 }

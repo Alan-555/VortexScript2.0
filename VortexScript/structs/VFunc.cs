@@ -9,11 +9,16 @@ namespace Vortex
         public VFuncArg[] Args { get; private set; }
 
         public string[] FunctionBody { get;  set; } = [];
+        public int StartLine { get; private set; }
 
-        public VFunc(string indetifier,VFile file,VFuncArg[] args){
+        public VFunc(string indetifier,VFile file,VFuncArg[] args,int startLine){
             Identifier = indetifier;
             File = file;
             Args = args;
+            StartLine = startLine;
+        }
+        public string GetFullPath(){
+            return File.GetFileName() + "." + Identifier+"()";
         }
     }
 

@@ -9,7 +9,7 @@
             else{
                 file = args[0];
             }
-            new Interpreter(new(file)).ExecuteFile();
+            new VFile(file).InterpretThisFile();
         }
     }
 }

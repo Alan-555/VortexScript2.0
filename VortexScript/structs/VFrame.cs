@@ -2,15 +2,20 @@ namespace Vortex
 {
     public class VFrame
     {
-        public VFile VFile {get; private set;}
-        public int LineStart {get; private set;}
+        public VFile VFile {get; private set;} //The file that this frame belongs to
+        public int LineOffset {get; private set;}
         public int currentLine;
         public Stack<VContext> ScopeStack {get; private set;} = new();
+        public string Name {get; private set;}
+        public int StartLine {get; private set;}
 
-        public VFrame(VFile vFile,int lineStart){
+        public VFrame(VFile vFile,int lineStart, string name){
             currentLine = lineStart;
-            LineStart = lineStart;
+            LineOffset = lineStart;
             VFile = vFile;
+            Name = name;
         }
+
+        public override string ToString() => $"{VFile.GetFileName()}:{LineOffset+1}";
     }
 }

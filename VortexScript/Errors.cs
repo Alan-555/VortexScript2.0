@@ -26,7 +26,18 @@ namespace Vortex{
             }
             Console.WriteLine("In: "+Interpreter.GetCurrentFrame().VFile.Path+":"+(Interpreter.GetCurrentFrame().currentLine+1));
             Console.WriteLine("Stack trace follows:");
-            //TODO: stack trace
+            int lastLine = 0;
+            List<string> toP = [];
+            foreach (var frame in Interpreter.CallStack.Reverse())
+            {
+                toP.Add($"{frame.Name} ({frame.VFile.GetFileName()}:{lastLine+1})");
+                lastLine = frame.currentLine;
+            }
+            toP.Reverse();
+            foreach (var p in toP)
+            {
+                Console.WriteLine(p);
+            }
 
             
             Environment.Exit(1);
@@ -48,9 +59,11 @@ namespace Vortex{
     public class VariableAlreadyDeclaredError(params string[] args): VortexError("A variable with the identifier '{0}' has already been declared in the current scope",args);
     public class IlegalStatementContextError(params string[] args) : VortexError("The statement '{0}' is not valid in the current context. ({1})",args);
     public class ScopeLeakError(params string[] args) : VortexError("The scope that began on line {0} has leaked.",args);
+    public class FunctionBodyLeakError(params string[] args) : VortexError("The function body that began on line {0} has leaked.",args);
     public class InvalidIdentifierError(params string[] args) : VortexError("The identifier '{0}' is not valid. Identifiers must begin with a letter or an '_', only letters, numbers and '_' are allowed and it musn't be a reserved keyword. ",args);
     public class UnmatchingDataTypeError(params string[] args) : VortexError("Unmatching data type. Could not convert from {0} to {1}",args);
     public class UnknownNameError(params string[] args) : VortexError("The name {0} does not exist in the current context.",args);
     public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$!' to allow for unset values)",args);
     public class IlegalDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.",args);
+    public class FuncOverloadNotFoundError(params string[] args) : VortexError("No overload found for function '{0}' that takes {1} argument(s)",args);
 }

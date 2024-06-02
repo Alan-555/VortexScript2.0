@@ -106,6 +106,34 @@ namespace Vortex
             return -1; // Return -1 if the search string is not found
         }
 
+        public static string[] StringSplit(string input, char delimiter)
+        {
+            List<string> result = new();
+            StringBuilder currentString = new();
+            bool insideQuotes = false;
+
+            foreach (char c in input)
+            {
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                }
+                else if (c == delimiter && !insideQuotes)
+                {
+                    result.Add(currentString.ToString());
+                    currentString.Clear();
+                }
+                else
+                {
+                    currentString.Append(c);
+                }
+            }
+
+            result.Add(currentString.ToString());
+            return result.ToArray();
+        }
+
+
 
         public static Dictionary<string, Variable> GetAllVars()
         {
@@ -125,6 +153,7 @@ namespace Vortex
         }
         public static bool IsIdentifierValid(string identifier)
         {
+            if(Interpreter.keywords.Contains(identifier))return false;
             string pattern = @"^[a-zA-Z_][a-zA-Z0-9_]*$";
             Regex regex = new(pattern);
             return regex.IsMatch(identifier);
