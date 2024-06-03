@@ -57,6 +57,7 @@ namespace Vortex{
     }
 
     public class VariableAlreadyDeclaredError(params string[] args): VortexError("A variable with the identifier '{0}' has already been declared in the current scope",args);
+    public class DuplicateVariableError(params string[] args): VortexError("A variable with the identifier '{0}' is a duplicate.",args);
     public class IlegalStatementContextError(params string[] args) : VortexError("The statement '{0}' is not valid in the current context. ({1})",args);
     public class ScopeLeakError(params string[] args) : VortexError("The scope that began on line {0} has leaked.",args);
     public class FunctionBodyLeakError(params string[] args) : VortexError("The function body that began on line {0} has leaked.",args);
@@ -66,4 +67,7 @@ namespace Vortex{
     public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$!' to allow for unset values)",args);
     public class IlegalDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.",args);
     public class FuncOverloadNotFoundError(params string[] args) : VortexError("No overload found for function '{0}' that takes {1} argument(s)",args);
+    public class InvalidFormatError(params string[] args) : VortexError("Cannot convert '{0}' to {1}",args);
+    public class StackOverflowError() : VortexError($"The call stack has exceeded the maximum size of {Interpreter.maxDepth} frames");
+    
 }

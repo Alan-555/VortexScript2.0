@@ -1,14 +1,13 @@
 using System.Diagnostics;
-using CodingSeb.ExpressionEvaluator;
 using Vorteval;
 namespace Vortex
 {
     public class ExpressionEval
     {
-        public static Variable Evaluate(string expression,DataType requiredType = DataType.None)
+        public static V_Variable Evaluate(string expression,DataType requiredType = DataType.None)
         {
             expression =  expression.Trim();
-            Evaluator ev = new(Utils.GetAllVars());
+            Evaluator ev = new();
             Stopwatch sw = new Stopwatch();
             sw.Start();
             var result = ev.Evaluate(expression);
@@ -17,7 +16,10 @@ namespace Vortex
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
             ts.Hours, ts.Minutes, ts.Seconds,
             ts.Milliseconds / 10);
-        Console.WriteLine("RunTime " + elapsedTime);
+            if(Interpreter.debug){
+                Console.WriteLine($"Expression '{expression}' took " + elapsedTime);
+
+            }
             /*ExpressionEvaluator eval = new(vars)
             {
                 OptionForceIntegerNumbersEvaluationsAsDoubleByDefault = true,

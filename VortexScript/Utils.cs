@@ -135,9 +135,9 @@ namespace Vortex
 
 
 
-        public static Dictionary<string, Variable> GetAllVars()
+        public static Dictionary<string, V_Variable> GetAllVars()
         {
-            Dictionary<string, Variable> vars =[ ];
+            Dictionary<string, V_Variable> vars =[ ];
             foreach (var Context in Interpreter.GetCurrentFrame().ScopeStack)
             {
                 foreach (var kv in Context.Variables)
@@ -154,7 +154,7 @@ namespace Vortex
         public static bool IsIdentifierValid(string identifier)
         {
             if(Interpreter.keywords.Contains(identifier))return false;
-            string pattern = @"^[a-zA-Z_][a-zA-Z0-9_]*$";
+            string pattern = @"^[a-zA-Z_🌋][a-zA-Z0-9_🌀🌋]*$";
             Regex regex = new(pattern);
             return regex.IsMatch(identifier);
         }

@@ -22,15 +22,18 @@ namespace Vorteval
                     HighestPrecedence = oper.Value.Priority;
             }
         }
-        Dictionary<string,Variable> localVars;
+        Dictionary<string,V_Variable> allVars;
+        Dictionary<string,VFunc> allFuncs;
+        
 
-        public Evaluator(Dictionary<string,Variable> localVars)
+        public Evaluator()
         {
-            this.localVars = localVars;
+            this.allVars = Utils.GetAllVars();
+            allFuncs = Interpreter.GetAllFunctions();
             Init();
         }
 
-        const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+        const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
 
 
         public static readonly Dictionary<DataType, Type> CSharpDataRepresentations = new(){
@@ -47,6 +50,8 @@ namespace Vorteval
             {DataType.Number,TokenType.Number},
             {DataType.Bool,TokenType.Bool},
             {DataType.Unset,TokenType.Unset},
+             {DataType.None,TokenType.Unset},
+             {DataType.Any,TokenType.Any},
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -54,6 +59,7 @@ namespace Vorteval
             {TokenType.Number,DataType.Number},
             {TokenType.Bool,DataType.Bool},
             {TokenType.Unset,DataType.Unset},
+            {TokenType.Any,DataType.Any},
 
         };
 
@@ -63,10 +69,15 @@ namespace Vorteval
             {"a§_", new("§",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
             {"_!b", new("!",DataType.None,DataType.Bool,(a,b)=> !b,0,DataType.Bool,true)},
             {"_-n", new("-",DataType.None,DataType.Number,(a,b)=> -b,0,DataType.Number,true)},
+            {"s~_", new("~",DataType.String,DataType.None,(a,b)=> {if(int.TryParse(a,out int res)) return res; else throw new InvalidFormatError(a,"a number");},0,DataType.Number,true)},
+            {"b~_", new("~",DataType.Bool,DataType.None,(a,b)=> a ? 1:0,0,DataType.Number,true)},
+            {"n~_", new("~",DataType.Number,DataType.None,(a,b)=>a,0,DataType.Number,true)},
             {"a??_", new("??",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
             //multiplicative
             { "n*n", new("*",DataType.Number, DataType.Number, (a, b) => a * b, 1,DataType.Number) },
             { "n/n", new("/",DataType.Number, DataType.Number, (a, b) => a / b, 1,DataType.Number) },
+            { "n%n", new("%",DataType.Number, DataType.Number, (a, b) => a % b, 1,DataType.Number) },
+            { "n°n", new("°",DataType.Number, DataType.Number, (a, b) => Math.Pow(a, b), 1,DataType.Number) },
 
             //addative
             { "n+n", new("+",DataType.Number, DataType.Number, (a, b) => a + b, 2,DataType.Number) },
@@ -75,18 +86,43 @@ namespace Vorteval
             { "s+n", new("+",DataType.Number, DataType.String, (a, b) => a + b.ToString(), 2) },
             { "s+s", new("+",DataType.String, DataType.String, (a, b) => a + b, 2) },
 
+            //bitshift
+            { "n<<n", new("<<",DataType.Number, DataType.Number, (a, b) => (int)a << (int)b, 3,DataType.Number) },
+            { "n>>n", new(">>",DataType.Number, DataType.Number, (a, b) => (int)a >> (int)b, 3,DataType.Number) },
+
+
+            //relative
+            {"n>n", new(">",DataType.Number, DataType.Number, (a,b) => a > b, 4,DataType.Bool) },
+            {"n<n", new("<",DataType.Number, DataType.Number, (a,b) => a < b, 4,DataType.Bool) },
+            {"n>=n", new(">=",DataType.Number, DataType.Number, (a,b) => a >= b, 4,DataType.Bool) },
+            {"n<=n", new("<=",DataType.Number, DataType.Number, (a,b) => a <= b, 4,DataType.Bool) },
+
+
             //compparative
-            {"n==n", new("==",DataType.Number, DataType.Number, (a,b) => a == b, 3,DataType.Bool) },
-            {"s==s", new("==",DataType.String, DataType.Number, (a,b) => a == b, 3,DataType.Bool) },
-            {"n==s", new("==",DataType.Number, DataType.String, (a,b) => a.ToString() == b, 3,DataType.Bool) },
-            {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 3,DataType.Bool) },
-            {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 3,DataType.Bool) },
+            {"n==n", new("==",DataType.Number, DataType.Number, (a,b) => a == b, 5,DataType.Bool) },
+            {"s==s", new("==",DataType.String, DataType.Number, (a,b) => a == b, 5,DataType.Bool) },
+            {"n==s", new("==",DataType.Number, DataType.String, (a,b) => a.ToString() == b, 5,DataType.Bool) },
+            {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 5,DataType.Bool) },
+            {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
+
+            //bitwise
+            { "n&n", new("&",DataType.Number, DataType.Number, (a, b) => a & b, 6,DataType.Number) },
+            { "n|n", new("|",DataType.Number, DataType.Number, (a, b) => a | b, 6,DataType.Number) },
+            { "n^n", new("^",DataType.Number, DataType.Number, (a, b) => a ^ b, 6,DataType.Number) },
+            
+
+            //logical
+            {"b&&b", new("&&",DataType.Bool, DataType.Bool, (a,b) => a && b, 7,DataType.Bool) },
+            {"b||b", new("||",DataType.Bool, DataType.Bool, (a,b) => a || b, 7,DataType.Bool) },
+            //ternary TODO:
+
+
         };
         public static string[] Operators = [];
 
         public string originalExpression;
 
-        public Variable Evaluate(string expression)
+        public V_Variable Evaluate(string expression)
         {
             originalExpression = expression;
             if(expression==""){
@@ -95,7 +131,7 @@ namespace Vorteval
             var tokens = Tokenize(expression);
             return RecursiveEval(tokens);
         }
-        Variable RecursiveEval(List<Token> tokens)
+        V_Variable RecursiveEval(List<Token> tokens)
         {
             //proccess scopes
             if (tokens.Any(x => x.type == TokenType.Scope))
@@ -133,7 +169,7 @@ namespace Vorteval
             }
             if (tokens.Count != 1)
             {
-                throw new ExpressionEvalError(this, "Too many tokens apeared after proccessing. Are you missing an operator?").SetInfo(TokensToExpression(tokens));
+                throw new ExpressionEvalError(this, "Too many tokens ("+TokensToExpression(tokens)+") apeared after proccessing. Are you missing an operator or an operand?");
             }
             var dataType = TokenToDataType[tokens[0].type];
             var value_ = tokens[0].value;
@@ -146,7 +182,7 @@ namespace Vorteval
             {
                 if (tokens[i].type == TokenType.Variable)
                 {
-                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable, localVars);
+                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable, allVars);
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
@@ -160,6 +196,16 @@ namespace Vorteval
                     else
                         tokens[i] = new(TokenType.String,in_);
 
+                }
+                else if(tokens[i].type == TokenType.Function){
+                    Interpreter.CallFunctionStatement(tokens[i].value,out var res);
+                    if(res==null){
+                        tokens[i] = new(TokenType.Unset,"unset");
+                    }
+                    else{
+                        tokens[i] = new(DataTypeToToken[res.Value.type], res.Value.value.ToString());
+
+                    }
                 }
             }
 
@@ -375,6 +421,30 @@ namespace Vorteval
                 {
                     if (currentToken.Length > 0)
                     {
+                        if(c=='('&&readingVar){
+                            if(allFuncs.TryGetValue(currentToken.ToString(),out var func)){
+                                string trucknated = expression[(i-currentToken.Length)..];
+                                int end = Utils.StringIndexOf(trucknated,")");
+                                var callFunctionStatement = trucknated[0..(end+1)];
+                                tokens.Add(new(TokenType.Function,callFunctionStatement));
+                                i = i-currentToken.Length+callFunctionStatement.Length;
+                                currentToken.Clear();
+                                readingVar = false;
+                                continue;
+
+                            }
+                            else{
+                                if(allVars.TryGetValue(currentToken.ToString(),out var var_)){
+                                    throw new UnmatchingDataTypeError(var_.type.ToString(),"VFunc");
+                                    
+                                }
+                                else{
+                                    throw new UnknownNameError(currentToken.ToString());
+
+                                }
+                            }
+                        }
+                        else
                         if (readingVar)
                         {
                             tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
@@ -399,8 +469,13 @@ namespace Vorteval
                                 break;
                             }
                         }
-                        if (Operators.Contains(operatorTest)&&!Operators.Any(x=>x.StartsWith(operatorTest+expression[i+1])))
+                        if (Operators.Contains(operatorTest))
                         {
+                            if(i<expression.Length-1){
+                                if(Operators.Any(x=>x.StartsWith(operatorTest+expression[i+1]))){
+                                    continue;
+                                }
+                            }
                             tokens.Add(new(TokenType.Operator, operatorTest));
                             operatorTest = "";
                         }
@@ -417,6 +492,7 @@ namespace Vorteval
 
                     if (c == '(' || c == ')')
                     {
+                        
                         tokens.Add(new Token(TokenType.Scope, c.ToString()));
                     }
 

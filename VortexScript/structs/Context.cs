@@ -2,7 +2,7 @@ namespace Vortex
 {
     public class VContext
     {
-        public Dictionary<string, Variable> Variables {private set; get;} //Local variables
+        public Dictionary<string, V_Variable> Variables {private set; get;} //Local variables
         public Dictionary<string, VFunc> Functions {private set; get;}
         public int Depth {private set; get;} //How deep we are
         public ScopeTypeEnum ScopeType {private set; get;} //Type of the scope
@@ -11,7 +11,9 @@ namespace Vortex
         public bool SubsequentFramesIgnore {set; get;} //When true, all subsequent frames in the stack will inhirit ignore flag and this flag, no matter the actual condition
         public VFunc? FuncBeingRead {set;get;} = null;
         public bool FuncTopLevel {set;get;} = false;
-        public VContext(Dictionary<string, Variable> vars,Dictionary<string, VFunc> funcs, int depth = 0, ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
+        public V_Variable? ReturnValue {set;get;} = null;
+        public bool InAFunc {get;set;} = false;
+        public VContext(Dictionary<string, V_Variable> vars,Dictionary<string, VFunc> funcs, int depth = 0, ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
             Variables = vars;
             Functions = funcs;
             Depth = depth;

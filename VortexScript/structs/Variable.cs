@@ -1,10 +1,10 @@
 namespace Vortex{
-    public struct Variable
+    public struct V_Variable
     {
         public DataType type;
         public object value;
         public bool unsetable;
-        public Variable(DataType type, object value,bool unsetable = false){
+        public V_Variable(DataType type, object value,bool unsetable = false){
             this.type = type;
             this.value = value;
             this.unsetable = unsetable;

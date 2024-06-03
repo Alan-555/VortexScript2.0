@@ -1,18 +1,31 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
-using CodingSeb.ExpressionEvaluator;
 
 namespace Vortex{
     public class Interpreter{
+        //Config
+        public static readonly int maxDepth = 512;
+        public static readonly string version  = "beta 1.0.0";
+        public static readonly bool debug = false;
+
+
+
         //Internal stuff
         static MethodInfo[] statements=[];
 
         //Memory
-        public readonly static string[] keywords = ["true","false","unset"];
-                public static Dictionary<string,Variable> SuperGlobals {get; private set;} = new(){
-            {"true", new Variable(DataType.Bool,true)},
-            {"false", new Variable(DataType.Bool,false)},
-            {"unset",new Variable(DataType.Unset,"")},
+        public  static string[] keywords = [];
+        public static Dictionary<string,Func< V_Variable>> SuperGlobals {get; private set;} = new(){
+            {"true", ()=>new V_Variable(DataType.Bool,true)},
+            {"false", ()=>new V_Variable(DataType.Bool,false)},
+            {"unset",()=>new V_Variable(DataType.Unset,"")},
+            {"🌀",()=>new V_Variable(DataType.String,"Vortex script v. "+version)},
+            {"this",()=>new V_Variable(DataType.String,GetCurrentFrame().VFile.GetFileName())},
+            {"_frame",()=>new V_Variable(DataType.String,GetCurrentFrame().Name)},
+            {"_depth",()=>new V_Variable(DataType.Number,GetCurrentContext().Depth)},
+            {"_line",()=>new V_Variable(DataType.Number,GetCurrentFrame().currentLine)},
+            {"none",()=>new V_Variable(DataType.None,"None")},
+            {"any",()=>new V_Variable(DataType.Any,"Any")},
         };
         public static Stack<VFrame> CallStack {get;private set;} = [];
 
@@ -23,24 +36,31 @@ namespace Vortex{
         public Interpreter(VFile file){
             File = file;
             if(statements.Length==0)
-                InitStatements();
+                Init();
         }
         
-        public void InitStatements(){
+        public void Init(){
             statements = Assembly.GetAssembly(typeof(Interpreter)).GetTypes()
                       .SelectMany(t => t.GetMethods())
                       .Where(m => m.GetCustomAttributes(typeof(MarkStatement), false).Length > 0)
                       .ToArray();
+            foreach (var var in SuperGlobals)
+            {
+                keywords = [.. keywords, var.Key];
+            }
         }
         public void ExecuteFile(){
             ExecuteLines(File.ReadFile());
         }
 
-         void ExecuteLines(string[] lines){
+         V_Variable? ExecuteLines(string[] lines){
             foreach(string line in lines){
                 try{    
                     ExecuteLine(line);
                     GetCurrentFrame().currentLine++;
+                    if(GetCurrentContext().ReturnValue!=null){
+                        return GetCurrentContext().ReturnValue;
+                    }
                 }
                 catch (ExpressionEvalError e){
                     VortexError.ThrowError(e);
@@ -52,6 +72,7 @@ namespace Vortex{
                     Console.WriteLine("An Interpreter error has occured. This is extraordinary and should not happen. Please report this error. The execution will now be halted. C# exception follows.");
                     throw;
                 }
+                
             }
             if(GetCurrentContext().Depth!=0){
                 if(GetCurrentContext().FuncBeingRead!=null)
@@ -59,6 +80,7 @@ namespace Vortex{
                 else
                     VortexError.ThrowError(new ScopeLeakError((GetCurrentContext().StartLine+1).ToString()));
             }
+            return null;
         }
 
         public void ExecuteLine(string line){
@@ -91,7 +113,7 @@ namespace Vortex{
                 if(FuncDeclaration(statement))
                     return;
                 else
-                if(CallFunctionStatement(statement)){
+                if(CallFunctionStatement(statement,out _)){
                     return;
                 }
                 else
@@ -124,6 +146,7 @@ namespace Vortex{
                         CloseContext();
                         OpenNewContext(ScopeTypeEnum.ifScope);
                         GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
+                        GetCurrentContext().InAFunc = context.InAFunc;
                         if(context.SubsequentFramesIgnore){
                             GetCurrentContext().Ignore = true;
                             GetCurrentContext().SubsequentFramesIgnore = true;
@@ -144,6 +167,7 @@ namespace Vortex{
                     GetCurrentContext().Ignore = prevContext.Ignore;
                     //inhirit function
                     GetCurrentContext().FuncBeingRead = prevContext.FuncBeingRead;
+                    GetCurrentContext().InAFunc = prevContext.InAFunc;
                     if(prevContext.Ignore){
                         GetCurrentContext().SubsequentFramesIgnore = true;
                     }
@@ -174,7 +198,7 @@ namespace Vortex{
             }
             else{
                 if(GetCurrentContext().ScopeType==ScopeTypeEnum.topLevel){
-                    throw new UnexpectedTokenError(";").SetInfo("Top level statement may not be closed. Use exit() instead");
+                    throw new UnexpectedTokenError(";").SetInfo("Top level statement may not be closed. Use exit instead");
                 }
                 GetCurrentFrame().ScopeStack.Pop();
 
@@ -240,6 +264,12 @@ namespace Vortex{
                 List<VFuncArg> argsList = new List<VFuncArg>();
                 foreach (var arg in argsArray)
                 {
+                    if(!Utils.IsIdentifierValid(arg)){
+                        throw new InvalidIdentifierError(arg);
+                    }
+                    if(argsList.Any(x=>x.name==arg)){
+                        throw new DuplicateVariableError(arg);
+                    }
                     argsList.Add(new(arg));
                 }
                 VFunc func = new(identifier,File, [.. argsList],GetCurrentFrame().currentLine);
@@ -259,7 +289,7 @@ namespace Vortex{
             GetCurrentContext().Functions.Add(func.Identifier,func);
             
         }
-        public bool CallFunctionStatement(string statement){
+        public static bool CallFunctionStatement(string statement,out V_Variable? val){
             if(Utils.StringContains(statement,"(")&&Utils.StringContains(statement,")")&&!statement.EndsWith(" :")){
                 int argsStart = Utils.StringIndexOf(statement,"(");
                 int argsEnd = Utils.StringIndexOf(statement,")");
@@ -292,28 +322,31 @@ namespace Vortex{
                 if(argsArray.Length!=func.Args.Length){//TODO: defualt params
                     throw new FuncOverloadNotFoundError(func.Identifier,argsArray.Length.ToString());
                 }
-                Dictionary<string,Variable> argsList = [];
+                Dictionary<string,V_Variable> argsList = [];
                 int i = 0;
                 foreach (var arg in argsArray)
                 {
                     argsList.Add(func.Args[i].name,ExpressionEval.Evaluate(arg,func.Args[i].enforcedType));
                     i++;
                 }
-                CallFunction(func,argsList);
+                val = CallFunction(func,argsList);
                 return true;
             }
+            val = null;
             return false;
         }
 
-        public void CallFunction(VFunc func,Dictionary<string,Variable> args){
+        public static V_Variable? CallFunction(VFunc func,Dictionary<string,V_Variable> args){
             NewFrame(func.File,ScopeTypeEnum.functionScope,func.StartLine+1,func.GetFullPath());
             Interpreter funcInterpreter = new(func.File);
             foreach (var arg in args)
             {
                 DeclareVar(arg.Key,arg.Value);
             }
-            funcInterpreter.ExecuteLines(func.FunctionBody);
+            GetCurrentContext().InAFunc = true;
+            var val = funcInterpreter.ExecuteLines(func.FunctionBody);
             CallStack.Pop();
+            return val;
         }
         //
         [MarkStatement("$",false)]
@@ -329,6 +362,9 @@ namespace Vortex{
                 throw new InvalidIdentifierError(identifier);
             }
             if(init){
+                if(statement.EndsWith('=')){
+                    throw new UnexpectedEndOfStatementError("Expression");
+                }
                 var initVal = ExpressionEval.Evaluate(statement[(statement.IndexOf('=') + 1)..]);
                 initVal.unsetable = unsetable;
                 bool failed = false;
@@ -350,6 +386,16 @@ namespace Vortex{
         [MarkStatement(">",false)]
         public void OutputStatement(string statement){
             Console.WriteLine(ExpressionEval.Evaluate(statement[1..]).value);
+        }
+
+        [MarkStatement("<",false)]
+        public void FuncReturnStatement(string statement){
+            if(GetCurrentContext().InAFunc){
+                GetCurrentContext().ReturnValue = ExpressionEval.Evaluate(statement[1..]);
+            }
+            else{
+                throw new UnexpectedTokenError("<").SetInfo("Return token may not be used outside of a function");
+            }
         }
 
         [MarkStatement("if",true,ScopeTypeEnum.ifScope)]
@@ -375,6 +421,10 @@ namespace Vortex{
         [MarkStatement(";",false,endsScope:true)]
         public void EndScopeStatement(string statement){
             
+        }
+        [MarkStatement("exit",false)]
+        public void ExitProgrammStatement(string statement){
+            Environment.Exit(0);
         }
         [MarkStatement("else :",true,ScopeTypeEnum.elseScope,true)]
         public void ElseScopeStatement(string statement){
@@ -406,9 +456,10 @@ namespace Vortex{
         //         throw new ReadingUnsetValue(identifier);
         //     return res;
         // }
-        public static bool ReadVar(string identifier, out Variable val,Dictionary<string,Variable>? vars = null ){
+        public static bool ReadVar(string identifier, out V_Variable val,Dictionary<string,V_Variable>? vars = null ){
             vars ??= Utils.GetAllVars();
-            if(SuperGlobals.TryGetValue(identifier, out  val)){
+            if(SuperGlobals.TryGetValue(identifier, out  var l)){
+                val = l();
                 return true;
             }
             var res = vars.TryGetValue(identifier, out val);
@@ -429,10 +480,7 @@ namespace Vortex{
             /*if(SuperGlobals.TryGetValue(identifier, out  val)){
                 return true;
             }*/
-            var funcs = new Dictionary<string,VFunc>{};
-            foreach (var func in GetCurrentFrame().ScopeStack.Last().Functions){
-                funcs.Add(func.Key,func.Value);
-            }
+            var funcs = GetAllFunctions();
             var res = funcs.TryGetValue(identifier, out val);
             if(!res){
                 if(!GetCurrentFrame().VFile.TopLevelContext.Functions.TryGetValue(identifier, out val)){
@@ -444,7 +492,17 @@ namespace Vortex{
             }
             return res;
         }
-        public bool SetVar(string identifier, Variable value,VContext? scope = null){
+        public static Dictionary<string,VFunc> GetAllFunctions(){
+            var funcs = new Dictionary<string,VFunc>{};
+            foreach (var func in GetCurrentFrame().ScopeStack.Last().Functions){
+                funcs.Add(func.Key,func.Value);
+            }
+            foreach (var func in GetCurrentFrame().VFile.TopLevelContext.Functions){
+                funcs.TryAdd(func.Key,func.Value);
+            }
+            return funcs;
+        }
+        public bool SetVar(string identifier, V_Variable value,VContext? scope = null){
             scope ??= GetCurrentContext();
             if(scope.Variables.ContainsKey(identifier)){
                 scope.Variables[identifier] = value;
@@ -452,7 +510,7 @@ namespace Vortex{
             }
             return false;
         }
-        public bool SetVar(string identifier, Variable value){
+        public bool SetVar(string identifier, V_Variable value){
             var vars = Utils.GetAllVars();
             if(vars.ContainsKey(identifier)){
                 vars[identifier] = value;
@@ -461,11 +519,14 @@ namespace Vortex{
             return false;
         }
 
-        public bool DeclareVar(string identifier,Variable var){
+        public static bool DeclareVar(string identifier,V_Variable var){
 
             return GetCurrentContext().Variables.TryAdd(identifier,var);
         }
-        public VFrame NewFrame(VFile file,ScopeTypeEnum scopeType,int lineOffset,string name){
+        public static VFrame NewFrame(VFile file,ScopeTypeEnum scopeType,int lineOffset,string name){
+            if(CallStack.Count==maxDepth){
+                throw new StackOverflowError();
+            }
             VFrame frame = new(file,lineOffset,name);
             frame.ScopeStack.Push(new ([],[],0,scopeType,StartLine:GetCurrentFrame().currentLine));
             CallStack.Push(frame);
