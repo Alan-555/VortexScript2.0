@@ -14,4 +14,5 @@ namespace Vortex
             EndsScope = endsScope;
         }
     }
+    
 }

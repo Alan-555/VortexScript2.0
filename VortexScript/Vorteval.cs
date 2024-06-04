@@ -22,13 +22,11 @@ namespace Vorteval
                     HighestPrecedence = oper.Value.Priority;
             }
         }
-        Dictionary<string,V_Variable> allVars;
         Dictionary<string,VFunc> allFuncs;
         
 
         public Evaluator()
         {
-            this.allVars = Utils.GetAllVars();
             allFuncs = Interpreter.GetAllFunctions();
             Init();
         }
@@ -151,7 +149,7 @@ namespace Vorteval
             }
             //proccess variables
             tokens = ProccessVariables(tokens);
-
+            tokens.RemoveAll(x=>x.type == TokenType.Ignore);
             //process operands and operators
             for (int i = 0; i < HighestPrecedence + 1; i++)
             {
@@ -178,11 +176,13 @@ namespace Vorteval
         }
         public List<Token> ProccessVariables(List<Token> tokens)
         {
+            VContext? module = null;
+            string moduleName = "";
             for (int i = 0; i < tokens.Count; i++)
             {
                 if (tokens[i].type == TokenType.Variable)
                 {
-                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable, allVars);
+                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable,module);
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
@@ -190,6 +190,9 @@ namespace Vorteval
                     tokens[i] = new(DataTypeToToken[variable.type], variable.value.ToString());
                 }
                 else if(tokens[i].type == TokenType.Console_in){
+                    if(module!=null){
+                        throw new ExpressionEvalError(this,$"The module '{moduleName}' doe not contain a definition for ':'");
+                    }
                     var in_ = Console.ReadLine();
                     if(in_=="")
                         tokens[i] = new(TokenType.Unset,"");
@@ -198,14 +201,21 @@ namespace Vorteval
 
                 }
                 else if(tokens[i].type == TokenType.Function){
-                    Interpreter.CallFunctionStatement(tokens[i].value,out var res);
+                    Interpreter.CallFunctionStatement(tokens[i].value,out var res,module);
                     if(res==null){
                         tokens[i] = new(TokenType.Unset,"unset");
                     }
                     else{
                         tokens[i] = new(DataTypeToToken[res.Value.type], res.Value.value.ToString());
-
                     }
+                    module = null;
+                }
+                else if (tokens[i].type == TokenType.Module){
+                    if(!Interpreter.activeModules.TryGetValue(tokens[i].value,out module)){
+                        throw new UnknownNameError(tokens[i].value);
+                    }
+                    moduleName = tokens[i].value;
+                    tokens[i] = new(TokenType.Ignore,"");
                 }
             }
 
@@ -405,6 +415,13 @@ namespace Vorteval
                 else if (c == ':'){
                     tokens.Add(new(TokenType.Console_in,""));
                 }
+                else if(readingVar&&c=='.'){
+
+                    tokens.Add(new(TokenType.Module, currentToken.ToString()));
+                    currentToken.Clear();
+                    readingVar = false;
+                    continue;
+                }
 
                 else if (!(!readingVar && char.IsDigit(c)) && identifierValidChars.Contains(c))
                 {
@@ -434,7 +451,7 @@ namespace Vorteval
 
                             }
                             else{
-                                if(allVars.TryGetValue(currentToken.ToString(),out var var_)){
+                                if(Utils.GetAllVars().TryGetValue(currentToken.ToString(),out var var_)){
                                     throw new UnmatchingDataTypeError(var_.type.ToString(),"VFunc");
                                     
                                 }
@@ -623,7 +640,8 @@ namespace Vorteval
         Unset = 7,
         Console_in = 8,
         Any = 9,
-        Int = 10,
+        Module = 10,
+        Ignore = 100,
 
         Unknown = -1 //  some garbage
     }

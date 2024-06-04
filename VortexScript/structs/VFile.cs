@@ -9,10 +9,21 @@ namespace Vortex
             Path = path;
             FileFrame = new(this,0,"Entrypoint("+Path+")");
         }
-        public void InterpretThisFile(){
-            FileFrame = new(this,0,"Entrypoint("+Path+")");
+        public void InterpretThisFile(bool entrypoint = false){
+            if(entrypoint){
+                FileFrame = new(this,0,"Entrypoint("+Path+")");
+            }
+            else{
+                FileFrame = new(this,0,"Acquired("+Path+")");
+            }
             Interpreter.CallStack.Push(FileFrame);
-            TopLevelContext = new VContext([],[],0,ScopeTypeEnum.topLevel);
+            TopLevelContext = new VContext([], [], 0, ScopeTypeEnum.topLevel)
+            {
+                IsMain = entrypoint
+            };
+            if (!Interpreter.activeModules.TryAdd(GetFileName(),TopLevelContext)){
+                throw new ModuleAlreadyLoadedError(GetFileName());
+            }
             FileFrame.ScopeStack.Push(TopLevelContext);
             new Interpreter(this).ExecuteFile();
         }
@@ -21,6 +32,9 @@ namespace Vortex
                 bufferedFile = FileReader.ReadFile(Path);
             }
             return bufferedFile;
+        }
+        public bool Exists(){
+            return FileReader.FileExists(Path);
         }
 
         public string GetFileName(){

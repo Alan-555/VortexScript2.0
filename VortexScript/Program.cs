@@ -4,12 +4,12 @@
         public static void Main(string[] args){
             string file;
             if(args.Length == 0){
-                file = "main.vort";
+                file = "script.vort";
             }  
             else{
                 file = args[0];
             }
-            new VFile(file).InterpretThisFile();
+            new VFile(file).InterpretThisFile(true);
         }
     }
 }

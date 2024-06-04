@@ -13,6 +13,9 @@ namespace Vortex
         public bool FuncTopLevel {set;get;} = false;
         public V_Variable? ReturnValue {set;get;} = null;
         public bool InAFunc {get;set;} = false;
+        public bool InTryStatement {get;set;} = false;
+        public VContext? TryParrentContext {get;set;} = null;
+        public bool IsMain {get;set;} = false;
         public VContext(Dictionary<string, V_Variable> vars,Dictionary<string, VFunc> funcs, int depth = 0, ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
             Variables = vars;
             Functions = funcs;
@@ -29,6 +32,8 @@ namespace Vortex
         ifScope = 1, //the scope immediately after an if statement 
         elseScope = 2, //the scope immediately after an else statement
         functionScope = 3, //scope inside a function
-        genericScope = 4 //scope defined by the user
+        genericScope = 4, //scope defined by the user
+        tryScope = 5, //try scope of a try-catch statement
+        catchScope = 6, //catch scope of a try-catch statement
     }
 }
