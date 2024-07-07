@@ -21,7 +21,7 @@ namespace Vortex
             {
                 IsMain = entrypoint
             };
-            if (!Interpreter.activeModules.TryAdd(GetFileName(),TopLevelContext)){
+            if (!Interpreter.ActiveModules.TryAdd(GetFileName(),TopLevelContext)){
                 throw new ModuleAlreadyLoadedError(GetFileName());
             }
             FileFrame.ScopeStack.Push(TopLevelContext);

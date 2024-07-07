@@ -1,14 +1,12 @@
+using System.Reflection;
+
 namespace Vortex{
 
-    public class InternalModule{
+    public  class InternalModule{
+    }
 
-        public string Name { get; set; }
-        public VContext ModuleContext {get;set;}
-
-        public InternalModule(string name, VContext moduleContext){
-            Name = name;
-            ModuleContext = moduleContext;
-        }
-
+    public struct InternalModuleDefinition{
+        public Dictionary<string,V_Variable> constants;
+        public Dictionary<string,VFunc>  functions;
     }
 }

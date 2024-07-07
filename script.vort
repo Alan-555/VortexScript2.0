@@ -1,2 +1,1 @@
-acquire lib
-> this
+$x = Math.Max(5,"a")

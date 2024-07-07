@@ -14,5 +14,14 @@ namespace Vortex
             EndsScope = endsScope;
         }
     }
+    public class InternalFunc : Attribute
+    {
+        public DataType ReturnType { get; set; }
     
+        public InternalFunc(DataType returnType)
+        {
+            ReturnType = returnType;
+        }
+    
+    }
 }

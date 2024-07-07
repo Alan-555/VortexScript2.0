@@ -4,12 +4,14 @@ namespace Vortex{
         public DataType type;
         public object value;
         public bool unsetable;
-        public V_Variable(DataType type, object value,bool unsetable = false){
+        public bool readonly_ = false;
+        public V_Variable(DataType type, object value,bool unsetable = false,bool readonly_ = false){
             this.type = type;
             this.value = value;
             this.unsetable = unsetable;
             if(type==DataType.Unset)
                 this.value = "unset";
+            this.readonly_ = readonly_;
         }
     }
 

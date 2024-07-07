@@ -15,5 +15,23 @@ namespace Vortex
             {"none",()=>new V_Variable(DataType.None,"None")},
             {"any",()=>new V_Variable(DataType.Any,"Any")},
         };
+
+        //Math
+        
+    }
+    public  class InternalMath : InternalModule{
+        public static readonly V_Variable Pi = new(DataType.Number,Math.PI);
+        public static readonly V_Variable E = new(DataType.Number,Math.E);
+
+        [InternalFunc(DataType.Number)]
+        public static double Max(double a, double b){
+            return Math.Max(a,b);
+        }
+    }
+    public  class InternalRandom : InternalModule{
+        [InternalFunc(DataType.Number)]
+        public static double Random(double a, double b){
+            return new Random().Next((int)b)+(int)a;
+        }
     }
 }

@@ -2,7 +2,7 @@ namespace Vortex
 {
     public class VContext
     {
-        public Dictionary<string, V_Variable> Variables {private set; get;} //Local variables
+        public Dictionary<string, V_Variable> Variables {set; get;} //Local variables
         public Dictionary<string, VFunc> Functions {private set; get;}
         public int Depth {private set; get;} //How deep we are
         public ScopeTypeEnum ScopeType {private set; get;} //Type of the scope
@@ -35,5 +35,6 @@ namespace Vortex
         genericScope = 4, //scope defined by the user
         tryScope = 5, //try scope of a try-catch statement
         catchScope = 6, //catch scope of a try-catch statement
+        internal_ = -1,
     }
 }

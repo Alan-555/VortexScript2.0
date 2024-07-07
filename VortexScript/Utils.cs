@@ -169,6 +169,9 @@ namespace Vortex
                 _ => null,
             };
         }
+        public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method){
+            return method.GetParameters().Select(x => new VFuncArg(x.Name)).ToArray();
+        }
 
 
         public static void Swap<T>(IList<T> list, int indexA, int indexB)

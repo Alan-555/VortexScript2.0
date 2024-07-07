@@ -63,14 +63,17 @@ namespace Vortex{
     public class FunctionBodyLeakError(params string[] args) : VortexError("The function body that began on line {0} has leaked.",args);
     public class InvalidIdentifierError(params string[] args) : VortexError("The identifier '{0}' is not valid. Identifiers must begin with a letter or an '_', only letters, numbers and '_' are allowed and it musn't be a reserved keyword. ",args);
     public class UnmatchingDataTypeError(params string[] args) : VortexError("Unmatching data type. Could not convert from {0} to {1}",args);
-    public class UnknownNameError(params string[] args) : VortexError("The name '{0}'' does not exist in the current context, or it might not match the required type",args);
-    public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$!' to allow for unset values)",args);
-    public class IlegalDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.",args);
+    public class UnknownNameError(params string[] args) : VortexError("The name '{0}' does not exist in the current context, or it might not match the required type",args);
+    public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$?' to allow for unset values)",args);
+    public class IlegalContextDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.",args);
+    public class IlegalDeclarationError(params string[] args) : VortexError("{0}",args);
     public class FuncOverloadNotFoundError(params string[] args) : VortexError("No overload found for function '{0}' that takes {1} argument(s)",args);
     public class InvalidFormatError(params string[] args) : VortexError("Cannot convert '{0}' to {1}",args);
     public class StackOverflowError() : VortexError($"The call stack has exceeded the maximum size of {Interpreter.maxDepth} frames");
     public class FileDoesNotExistError(params string[] args) : VortexError("The file '{0}' does not exist",args);
     public class ModuleAlreadyLoadedError(params string[] args) : VortexError("Module '{0}' has already been loaded",args);
+    public class AssigmentToReadonlyVarError(params string[] args) : VortexError("Variable '{0}' is read-only",args);
+    
     
     
 }

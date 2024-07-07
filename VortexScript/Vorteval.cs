@@ -22,12 +22,10 @@ namespace Vorteval
                     HighestPrecedence = oper.Value.Priority;
             }
         }
-        Dictionary<string,VFunc> allFuncs;
         
 
         public Evaluator()
         {
-            allFuncs = Interpreter.GetAllFunctions();
             Init();
         }
 
@@ -41,6 +39,13 @@ namespace Vorteval
             {DataType.None,typeof(object)},
             {DataType.Any,typeof(object)},
             {DataType.Int,typeof(int)},
+
+        };
+        public static readonly Dictionary<Type, DataType> CsharpToVortex = new(){
+            {typeof(string),DataType.String},
+            {typeof(int),DataType.Number},
+            {typeof(double),DataType.Number},
+            {typeof(bool),DataType.Bool},
 
         };
         public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
@@ -182,7 +187,7 @@ namespace Vorteval
             {
                 if (tokens[i].type == TokenType.Variable)
                 {
-                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable,module);
+                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable,module,module!=null);
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
@@ -211,11 +216,19 @@ namespace Vorteval
                     module = null;
                 }
                 else if (tokens[i].type == TokenType.Module){
-                    if(!Interpreter.activeModules.TryGetValue(tokens[i].value,out module)){
-                        throw new UnknownNameError(tokens[i].value);
+                    if(!Interpreter.ActiveModules.TryGetValue(tokens[i].value,out module)){
+                        if(Interpreter.InternalModules.TryGetValue(tokens[i].value,out module)){
+                            moduleName = tokens[i].value;
+                            tokens[i] = new(TokenType.Ignore,"");
+                        }
+                        else{
+                            throw new UnknownNameError(tokens[i].value);
+                        }
                     }
-                    moduleName = tokens[i].value;
-                    tokens[i] = new(TokenType.Ignore,"");
+                    else{
+                        moduleName = tokens[i].value;
+                        tokens[i] = new(TokenType.Ignore,"");
+                    }
                 }
             }
 
@@ -439,26 +452,15 @@ namespace Vorteval
                     if (currentToken.Length > 0)
                     {
                         if(c=='('&&readingVar){
-                            if(allFuncs.TryGetValue(currentToken.ToString(),out var func)){
-                                string trucknated = expression[(i-currentToken.Length)..];
-                                int end = Utils.StringIndexOf(trucknated,")");
-                                var callFunctionStatement = trucknated[0..(end+1)];
-                                tokens.Add(new(TokenType.Function,callFunctionStatement));
-                                i = i-currentToken.Length+callFunctionStatement.Length;
-                                currentToken.Clear();
-                                readingVar = false;
-                                continue;
-
-                            }
-                            else{
-                                if(Utils.GetAllVars().TryGetValue(currentToken.ToString(),out var var_)){
-                                    throw new UnmatchingDataTypeError(var_.type.ToString(),"VFunc");
-                                    
-                                }
-                                else{
-                                    throw new UnknownNameError(currentToken.ToString());
-
-                                }
+                            string trucknated = expression[(i-currentToken.Length)..];
+                            int end = Utils.StringIndexOf(trucknated,")"); //TODO: fix edge cases like: func(3,5*(3+5))
+                            var callFunctionStatement = trucknated[0..(end+1)];
+                            tokens.Add(new(TokenType.Function,callFunctionStatement));
+                            i = i-currentToken.Length+callFunctionStatement.Length;
+                            currentToken.Clear();
+                            readingVar = false;
+                            if(i>=expression.Length){
+                                break;
                             }
                         }
                         else
