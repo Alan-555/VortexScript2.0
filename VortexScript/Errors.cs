@@ -39,8 +39,8 @@ namespace Vortex{
                 Console.WriteLine(p);
             }
 
-            
-            Environment.Exit(1);
+            if(!Interpreter.itm)
+                Environment.Exit(1);
         }
     }
 

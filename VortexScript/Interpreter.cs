@@ -10,6 +10,7 @@ namespace Vortex
         public static readonly string version = "beta 1.0.0";
         public static readonly bool debug = false;
 
+        public static  bool itm = false;
 
 
         //Internal stuff
@@ -72,7 +73,15 @@ namespace Vortex
         }
         public void ExecuteFile()
         {
-            ExecuteLines(File.ReadFile());
+            if(File.Path==Program.InteractiveTermMode){
+                itm = true;
+                while(true){
+                    ExecuteLines([Console.ReadLine()!]);
+                }
+            }
+            else{
+                ExecuteLines(File.ReadFile());
+            }
         }
 
         V_Variable? ExecuteLines(string[] lines)
@@ -289,6 +298,9 @@ namespace Vortex
         }
         public static VContext GetCurrentContext()
         {
+            if(!GetCurrentFrame().ScopeStack.TryPeek(out _)){
+                return new([],[]);
+            }
             return GetCurrentFrame().ScopeStack.First();
         }
         public bool AssignStatement(string statement)

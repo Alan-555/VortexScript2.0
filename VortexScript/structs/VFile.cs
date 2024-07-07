@@ -31,6 +31,9 @@ namespace Vortex
             new Interpreter(this).ExecuteFile();
         }
         public string[] ReadFile(){
+            if(Path==Program.InteractiveTermMode){
+                
+            }
             if(bufferedFile.Length==0){
                 bufferedFile = FileReader.ReadFile(Path);
             }
