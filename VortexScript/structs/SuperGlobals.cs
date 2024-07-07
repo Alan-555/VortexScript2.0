@@ -27,11 +27,44 @@ namespace Vortex
         public static double Max(double a, double b){
             return Math.Max(a,b);
         }
+        [InternalFunc(DataType.Number)]
+        public static double Min(double a, double b){
+            return Math.Min(a,b);
+        }
+        [InternalFunc(DataType.Number)]
+        public static double Sin(double a){
+            return Math.Sin(a);
+        }
+        [InternalFunc(DataType.Number)]
+        public static double Sqrt(double a){
+            return Math.Sqrt(a);
+        }
+        [InternalFunc(DataType.Number)]
+        public static double Pow(double a,double b){
+            return Math.Pow(a,b);
+        }
+        [InternalFunc(DataType.Number)]
+        public static double Root(double a,double b){
+            return Math.Pow(a,1/b);
+        }
     }
     public  class InternalRandom : InternalModule{
+        public static Random random;
+
         [InternalFunc(DataType.Number)]
         public static double Random(double a, double b){
             return new Random().Next((int)b)+(int)a;
+        }
+
+        [InternalFunc(DataType.Unset)]
+        public static void SetSeed(int a){
+            random = new(a);
+        }
+    }
+     public  class InternalStd : InternalModule{
+        [InternalFunc(DataType.Unset)]
+        public static void Print(string a){
+            Console.WriteLine(a);
         }
     }
 }

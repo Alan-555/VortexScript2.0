@@ -54,18 +54,20 @@ namespace Vortex
                 var method = type
                 .GetMethods()
                 .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
-                .Select(mi => new VFunc(mi.Name,null,Utils.ConvertMethodInfoToArgs(mi),-1){CSharpFunc=mi,returnType=(DataType)Utils.GetStatementAttribute(mi, 0).Value!})
-                .ToDictionary(x => x.Identifier, x => x);
-                
+                .Select(mi => new VFunc(mi.Name, null, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
+                .ToDictionary(x => {var id = x.Identifier;id=id[0].ToString().ToLower()+id[1..];return id;}, x => x);
+
                 Dictionary<string, V_Variable> constants = new();
-                type.GetFields(BindingFlags.Public | BindingFlags.Static)
+                type.GetFields(BindingFlags.Public | BindingFlags.Static )
                 .ToList()
-                .ForEach(f => 
+                .ForEach(f =>
                 {
-                    var val = (V_Variable)f.GetValue(null)!;
-                    constants.Add(f.Name, val);
+                    if(f.GetValue(null)!=null){
+                        var val = (V_Variable)f.GetValue(null)!;
+                        constants.Add(f.Name, val);
+                    }
                 });
-                InternalModules.Add(type.Name[8..], new(constants,method,scopeType:ScopeTypeEnum.internal_));
+                InternalModules.Add(type.Name[8..], new(constants, method, scopeType: ScopeTypeEnum.internal_));
             }
         }
         public void ExecuteFile()
@@ -389,7 +391,10 @@ namespace Vortex
             if (Utils.StringContains(statement, "(") && Utils.StringContains(statement, ")") && !statement.EndsWith(" :"))
             {
                 int argsStart = Utils.StringIndexOf(statement, "(");
-                int argsEnd = Utils.StringIndexOf(statement, ")");
+                int argsEnd = Utils.StringLastIndexOf(statement, ')');
+                if(argsEnd!=statement.Length-1){
+                    throw new UnexpectedTokenError(statement[(argsEnd+1)..]);
+                }
                 if (argsStart == 0)
                 {
                     throw new UnexpectedTokenError("=").SetInfo("Function identifier expected prior");
@@ -403,9 +408,22 @@ namespace Vortex
                     throw new ExpectedTokenError(")");
                 }
                 string identifier = statement[0..statement.IndexOf('(')];
+                int i = Utils.StringIndexOf(identifier, ".");
+                var module = "";
+                if (i != -1&&i<argsStart)
+                {
+                    module = identifier[..i];
+                    identifier = identifier[(i+1)..];
+                }
                 if (!Utils.IsIdentifierValid(identifier))
                 {
                     throw new InvalidIdentifierError(identifier);
+                }
+                if (module != "")
+                {
+                    if(!TryGetModule(module,out context)){
+                        throw new UnknownNameError(module);
+                    }
                 }
                 if (!ReadFunction(identifier, out var func, context))
                 {
@@ -429,7 +447,7 @@ namespace Vortex
                     throw new FuncOverloadNotFoundError(func.Identifier, argsArray.Length.ToString());
                 }
                 Dictionary<string, V_Variable> argsList = [];
-                int i = 0;
+                i = 0;
                 foreach (var arg in argsArray)
                 {
                     argsList.Add(func.Args[i].name, ExpressionEval.Evaluate(arg, func.Args[i].enforcedType));
@@ -444,9 +462,16 @@ namespace Vortex
 
         public static V_Variable? CallFunction(VFunc func, Dictionary<string, V_Variable> args)
         {
-            if(func.CSharpFunc != null){
-                var args_ = args.Select(x => Utils.CastToCSharpType(x.Value.type,x.Value.value.ToString())).ToArray();
-                var val_ = func.CSharpFunc.Invoke(null, args_);
+            if (func.CSharpFunc != null)
+            {
+                var args_ = args.Select(x => Utils.CastToCSharpType(x.Value.type, x.Value.value.ToString())).ToArray();
+                object? val_ = null;
+                try{
+                    val_ = func.CSharpFunc.Invoke(null, args_);
+                }
+                catch(ArgumentException){
+                    throw new FuncOverloadNotFoundError(func.Identifier,"-");
+                }
                 return new V_Variable(func.returnType, val_);
             }
             NewFrame(func.File, ScopeTypeEnum.functionScope, func.StartLine + 1, func.GetFullPath());
@@ -467,7 +492,7 @@ namespace Vortex
             statement = Utils.StringRemoveSpaces(statement);
             bool unsetable = statement[1] == '?';
             bool readonly_ = statement[1] == '!';
-            if (unsetable||readonly_)
+            if (unsetable || readonly_)
             {
                 statement = statement.Remove(1, 1);
             }
@@ -498,7 +523,8 @@ namespace Vortex
             }
             else
             {
-                if(readonly_){
+                if (readonly_)
+                {
                     throw new IlegalDeclarationError("A read-only variable has to be initialized");
                 }
                 if (!DeclareVar(identifier, new(DataType.Unset, "unset", unsetable)))
@@ -667,7 +693,7 @@ namespace Vortex
         //         throw new ReadingUnsetValue(identifier);
         //     return res;
         // }
-        public static bool ReadVar(string identifier, out V_Variable val, VContext? context = null,bool ignoreTopLevel = false)
+        public static bool ReadVar(string identifier, out V_Variable val, VContext? context = null, bool ignoreTopLevel = false)
         {
             Dictionary<string, V_Variable> vars;
             if (context == null)
@@ -686,7 +712,8 @@ namespace Vortex
             var res = vars.TryGetValue(identifier, out val);
             if (!res)
             {
-                if(context?.ScopeType==ScopeTypeEnum.internal_||ignoreTopLevel){
+                if (context?.ScopeType == ScopeTypeEnum.internal_ || ignoreTopLevel)
+                {
                     return false;
                 }
                 if (!GetCurrentFrame().VFile.TopLevelContext.Variables.TryGetValue(identifier, out val))
@@ -703,7 +730,7 @@ namespace Vortex
                 throw new ReadingUnsetValueError(identifier);
             return res;
         }
-        public static bool ReadFunction(string identifier, out VFunc val, VContext? context = null,bool ignoreTopLevel = false)
+        public static bool ReadFunction(string identifier, out VFunc val, VContext? context = null, bool ignoreTopLevel = false)
         {
             /*if(SuperGlobals.TryGetValue(identifier, out  val)){
                 return true;
@@ -720,7 +747,8 @@ namespace Vortex
             var res = funcs.TryGetValue(identifier, out val);
             if (!res)
             {
-                 if(context?.ScopeType==ScopeTypeEnum.internal_||ignoreTopLevel){
+                if (context?.ScopeType == ScopeTypeEnum.internal_ || ignoreTopLevel)
+                {
                     return false;
                 }
                 if (!GetCurrentFrame().VFile.TopLevelContext.Functions.TryGetValue(identifier, out val))
@@ -754,6 +782,10 @@ namespace Vortex
             }
             return funcs;
         }
+        public static bool TryGetModule(string name,out VContext module)
+        {
+            return ActiveModules.TryGetValue(name, out module)||InternalModules.TryGetValue(name, out module);
+        }
         public static Dictionary<string, VFunc> GetAllModuleFuncs(VContext module)
         {
             return module.Functions;
@@ -773,7 +805,7 @@ namespace Vortex
             var vars = Utils.GetAllVars();
             if (vars.ContainsKey(identifier))
             {
-                if(vars[identifier].readonly_)
+                if (vars[identifier].readonly_)
                     throw new AssigmentToReadonlyVarError(identifier);
                 vars[identifier] = value;
                 return true;

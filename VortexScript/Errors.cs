@@ -73,6 +73,7 @@ namespace Vortex{
     public class FileDoesNotExistError(params string[] args) : VortexError("The file '{0}' does not exist",args);
     public class ModuleAlreadyLoadedError(params string[] args) : VortexError("Module '{0}' has already been loaded",args);
     public class AssigmentToReadonlyVarError(params string[] args) : VortexError("Variable '{0}' is read-only",args);
+    public class UseOfAReservedNameError(params string[] args) : VortexError("Name '{0}' is reserved and cannot be used!",args);
     
     
     

@@ -11,6 +11,8 @@ namespace Vortex{
             this.unsetable = unsetable;
             if(type==DataType.Unset)
                 this.value = "unset";
+            if(value==null)
+                this.value = "unset";
             this.readonly_ = readonly_;
         }
     }

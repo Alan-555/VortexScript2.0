@@ -22,7 +22,7 @@ namespace Vorteval
                     HighestPrecedence = oper.Value.Priority;
             }
         }
-        
+
 
         public Evaluator()
         {
@@ -128,8 +128,9 @@ namespace Vorteval
         public V_Variable Evaluate(string expression)
         {
             originalExpression = expression;
-            if(expression==""){
-                throw new ExpressionEvalError(this,"Empty expression");
+            if (expression == "")
+            {
+                throw new ExpressionEvalError(this, "Empty expression");
             }
             var tokens = Tokenize(expression);
             return RecursiveEval(tokens);
@@ -154,7 +155,7 @@ namespace Vorteval
             }
             //proccess variables
             tokens = ProccessVariables(tokens);
-            tokens.RemoveAll(x=>x.type == TokenType.Ignore);
+            tokens.RemoveAll(x => x.type == TokenType.Ignore);
             //process operands and operators
             for (int i = 0; i < HighestPrecedence + 1; i++)
             {
@@ -172,12 +173,12 @@ namespace Vorteval
             }
             if (tokens.Count != 1)
             {
-                throw new ExpressionEvalError(this, "Too many tokens ("+TokensToExpression(tokens)+") apeared after proccessing. Are you missing an operator or an operand?");
+                throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens) + ") apeared after proccessing. Are you missing an operator or an operand?");
             }
             var dataType = TokenToDataType[tokens[0].type];
             var value_ = tokens[0].value;
             var value = Utils.CastToCSharpType(dataType, value_);
-            return new(dataType,value);
+            return new(dataType, value);
         }
         public List<Token> ProccessVariables(List<Token> tokens)
         {
@@ -187,48 +188,52 @@ namespace Vorteval
             {
                 if (tokens[i].type == TokenType.Variable)
                 {
-                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable,module,module!=null);
+                    bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module, module != null);
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
                     }
                     tokens[i] = new(DataTypeToToken[variable.type], variable.value.ToString());
                 }
-                else if(tokens[i].type == TokenType.Console_in){
-                    if(module!=null){
-                        throw new ExpressionEvalError(this,$"The module '{moduleName}' doe not contain a definition for ':'");
+                else if (tokens[i].type == TokenType.Console_in)
+                {
+                    if (module != null)
+                    {
+                        throw new ExpressionEvalError(this, $"The module '{moduleName}' doe not contain a definition for ':'");
                     }
                     var in_ = Console.ReadLine();
-                    if(in_=="")
-                        tokens[i] = new(TokenType.Unset,"");
+                    if (in_ == "")
+                        tokens[i] = new(TokenType.Unset, "");
                     else
-                        tokens[i] = new(TokenType.String,in_);
+                        tokens[i] = new(TokenType.String, in_);
 
                 }
-                else if(tokens[i].type == TokenType.Function){
-                    Interpreter.CallFunctionStatement(tokens[i].value,out var res,module);
-                    if(res==null){
-                        tokens[i] = new(TokenType.Unset,"unset");
+                else if (tokens[i].type == TokenType.Function)
+                {
+                    Interpreter.CallFunctionStatement(tokens[i].value, out var res, module);
+                    if (res == null)
+                    {
+                        tokens[i] = new(TokenType.Unset, "unset");
                     }
-                    else{
+                    else
+                    {
                         tokens[i] = new(DataTypeToToken[res.Value.type], res.Value.value.ToString());
                     }
                     module = null;
                 }
-                else if (tokens[i].type == TokenType.Module){
-                    if(!Interpreter.ActiveModules.TryGetValue(tokens[i].value,out module)){
-                        if(Interpreter.InternalModules.TryGetValue(tokens[i].value,out module)){
-                            moduleName = tokens[i].value;
-                            tokens[i] = new(TokenType.Ignore,"");
-                        }
-                        else{
-                            throw new UnknownNameError(tokens[i].value);
-                        }
-                    }
-                    else{
+                else if (tokens[i].type == TokenType.Module)
+                {
+
+                    if (Interpreter.TryGetModule(tokens[i].value, out module))
+                    {
                         moduleName = tokens[i].value;
-                        tokens[i] = new(TokenType.Ignore,"");
+                        tokens[i] = new(TokenType.Ignore, "");
                     }
+                    else
+                    {
+                        throw new UnknownNameError(tokens[i].value);
+                    }
+
                 }
             }
 
@@ -253,14 +258,14 @@ namespace Vorteval
                     try
                     {
                         left = tokens[leftI].type.ToString().ToLower()[0];
-                        if(left=='o')
+                        if (left == 'o')
                             left = '_';
                     }
                     catch { }
                     try
                     {
                         right = tokens[rightI].type.ToString().ToLower()[0];
-                        if(right=='o')
+                        if (right == 'o')
                             right = '_';
                     }
                     catch { }
@@ -297,14 +302,14 @@ namespace Vorteval
                         {
                             if (right == '_')
                             {
-                                throw new ExpressionEvalError(this, "Expected an operand after unary operator '"+oper.Oper+"'");
+                                throw new ExpressionEvalError(this, "Expected an operand after unary operator '" + oper.Oper + "'");
                             }
                         }
                         else
                         {
                             if (left == '_')
                             {
-                                throw new ExpressionEvalError(this, "Expected an operand before unary operator '"+oper.Oper+"'");
+                                throw new ExpressionEvalError(this, "Expected an operand before unary operator '" + oper.Oper + "'");
                             }
                         }
                     }
@@ -324,18 +329,20 @@ namespace Vorteval
             {
                 if (oper.Unary)
                 {
-                    if(oper.Oper=="??"){
+                    if (oper.Oper == "??")
+                    {
                         var val1 = tokens[leftI];
                         var result = val1.type != TokenType.Unset;
                         tokens.RemoveRange(leftI, 2);
                         tokens.Insert(leftI, new(TokenType.Bool, result.ToString()));
                     }
                     else
-                    if(oper.Oper=="§"){
+                    if (oper.Oper == "§")
+                    {
                         var val1 = tokens[leftI];
                         var result = val1.type != TokenType.Unset;
                         tokens.RemoveRange(leftI, 2);
-                        if(result)
+                        if (result)
                             tokens.Insert(leftI, val1);
                         else
                             tokens.Insert(leftI, new(TokenType.String, ""));
@@ -425,10 +432,12 @@ namespace Vorteval
                     }
                     continue;
                 }
-                else if (c == ':'){
-                    tokens.Add(new(TokenType.Console_in,""));
+                else if (c == ':')
+                {
+                    tokens.Add(new(TokenType.Console_in, ""));
                 }
-                else if(readingVar&&c=='.'){
+                else if (readingVar && c == '.')
+                {
 
                     tokens.Add(new(TokenType.Module, currentToken.ToString()));
                     currentToken.Clear();
@@ -451,15 +460,17 @@ namespace Vorteval
                 {
                     if (currentToken.Length > 0)
                     {
-                        if(c=='('&&readingVar){
-                            string trucknated = expression[(i-currentToken.Length)..];
-                            int end = Utils.StringIndexOf(trucknated,")"); //TODO: fix edge cases like: func(3,5*(3+5))
-                            var callFunctionStatement = trucknated[0..(end+1)];
-                            tokens.Add(new(TokenType.Function,callFunctionStatement));
-                            i = i-currentToken.Length+callFunctionStatement.Length;
+                        if (c == '(' && readingVar)
+                        {
+                            string trucknated = expression[(i - currentToken.Length)..];
+                            int end = Utils.StringLastIndexOf(trucknated, ')');
+                            var callFunctionStatement = trucknated[0..(end + 1)];
+                            tokens.Add(new(TokenType.Function, callFunctionStatement));
+                            i = i - currentToken.Length + callFunctionStatement.Length;
                             currentToken.Clear();
                             readingVar = false;
-                            if(i>=expression.Length){
+                            if (i >= expression.Length)
+                            {
                                 break;
                             }
                         }
@@ -490,8 +501,10 @@ namespace Vorteval
                         }
                         if (Operators.Contains(operatorTest))
                         {
-                            if(i<expression.Length-1){
-                                if(Operators.Any(x=>x.StartsWith(operatorTest+expression[i+1]))){
+                            if (i < expression.Length - 1)
+                            {
+                                if (Operators.Any(x => x.StartsWith(operatorTest + expression[i + 1])))
+                                {
                                     continue;
                                 }
                             }
@@ -511,7 +524,7 @@ namespace Vorteval
 
                     if (c == '(' || c == ')')
                     {
-                        
+
                         tokens.Add(new Token(TokenType.Scope, c.ToString()));
                     }
 
@@ -519,8 +532,9 @@ namespace Vorteval
                     {
                         inString = true;
                     }
-                    else if(c==' '){
-                        
+                    else if (c == ' ')
+                    {
+
                     }
                     else
                     {
@@ -528,8 +542,9 @@ namespace Vorteval
                     }
                 }
             }
-            if(operatorTest!=""){
-                throw new ExpressionEvalError(this,"Unknown operator "+operatorTest);
+            if (operatorTest != "")
+            {
+                throw new ExpressionEvalError(this, "Unknown operator " + operatorTest);
             }
             if (currentToken.Length > 0)
             {
@@ -653,12 +668,14 @@ namespace Vorteval
         public bool TryGet(string key, out Operator result)
         {
             KeyValuePair<string, Operator> result_ = default;
-            if(key.Contains("??")){
-                result_ = new("a??_", new("??",DataType.Any,DataType.None,(a,b)=> a,0,DataType.Number,true));
+            if (key.Contains("??"))
+            {
+                result_ = new("a??_", new("??", DataType.Any, DataType.None, (a, b) => a, 0, DataType.Number, true));
             }
             else
-            if(key.Contains("§")){
-                result_ = new("a§_", new("§",DataType.Any,DataType.None,(a,b)=> a,0,DataType.Number,true));
+            if (key.Contains("§"))
+            {
+                result_ = new("a§_", new("§", DataType.Any, DataType.None, (a, b) => a, 0, DataType.Number, true));
             }
             else
             if (key.Contains('_'))
@@ -690,7 +707,7 @@ namespace Vorteval
                     }
                 }
             }
-           
+
             else
             {
                 return base.TryGetValue(key, out result);

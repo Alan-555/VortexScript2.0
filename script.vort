@@ -1,1 +1,1 @@
-$x = Math.Max(5,"a")
+> Math.pow(Math.max(1,3),2)

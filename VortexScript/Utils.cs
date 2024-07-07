@@ -106,19 +106,57 @@ namespace Vortex
             return -1; // Return -1 if the search string is not found
         }
 
+        public static int StringLastIndexOf(string input, char searchChar)
+        {
+            bool insideQuotes = false;
+            int inputLength = input.Length;
+            int matchIndex = -1;
+
+            for (int i = 0; i < inputLength; i++)
+            {
+                char c = input[i];
+
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    continue;
+                }
+
+                if (!insideQuotes)
+                {
+                    if(c==searchChar){
+                        matchIndex = i;
+                    }
+                }
+            }
+            
+
+            return matchIndex;
+        }
+
         public static string[] StringSplit(string input, char delimiter)
         {
             List<string> result = new();
             StringBuilder currentString = new();
             bool insideQuotes = false;
+            int nestedScope = 0;
 
             foreach (char c in input)
             {
                 if (c == '\"')
                 {
                     insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    currentString.Append('"');
                 }
-                else if (c == delimiter && !insideQuotes)
+                else if (c == '('){
+                    nestedScope++;
+                    currentString.Append('(');
+                }
+                else if(c == ')'){
+                    nestedScope--;
+                    currentString.Append(')');
+                }
+                else if (c == delimiter && !insideQuotes&&nestedScope==0)
                 {
                     result.Add(currentString.ToString());
                     currentString.Clear();
@@ -150,6 +188,10 @@ namespace Vortex
         public static CustomAttributeTypedArgument GetStatementAttribute(MethodInfo statement, StatementAttributes index)
         {
             return statement.CustomAttributes.ToList()[0].ConstructorArguments[(int)index];
+        }
+        public static CustomAttributeTypedArgument GetStatementAttribute<T>(MethodInfo statement,int index)
+        {
+            return statement.CustomAttributes.ToList().Find(x=>x.AttributeType==typeof(T)).ConstructorArguments[index];
         }
         public static bool IsIdentifierValid(string identifier)
         {

@@ -8,6 +8,9 @@ namespace Vortex
         public VFile(string path){
             Path = path;
             FileFrame = new(this,0,"Entrypoint("+Path+")");
+            if(Interpreter.InternalModules.ContainsKey(GetFileName())){
+                throw new UseOfAReservedNameError(GetFileName());
+            }
         }
         public void InterpretThisFile(bool entrypoint = false){
             if(entrypoint){
