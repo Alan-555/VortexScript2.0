@@ -124,12 +124,13 @@ namespace Vortex
 
                 if (!insideQuotes)
                 {
-                    if(c==searchChar){
+                    if (c == searchChar)
+                    {
                         matchIndex = i;
                     }
                 }
             }
-            
+
 
             return matchIndex;
         }
@@ -148,15 +149,17 @@ namespace Vortex
                     insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
                     currentString.Append('"');
                 }
-                else if (c == '('){
+                else if (c == '(')
+                {
                     nestedScope++;
                     currentString.Append('(');
                 }
-                else if(c == ')'){
+                else if (c == ')')
+                {
                     nestedScope--;
                     currentString.Append(')');
                 }
-                else if (c == delimiter && !insideQuotes&&nestedScope==0)
+                else if (c == delimiter && !insideQuotes && nestedScope == 0)
                 {
                     result.Add(currentString.ToString());
                     currentString.Clear();
@@ -171,11 +174,33 @@ namespace Vortex
             return result.ToArray();
         }
 
-
+        public static VArray? ArgsEval(string input, char delimiter,DataType[]? dataTypes=null)
+        {
+            var argsArray = StringSplit(input, delimiter);
+            if (argsArray.Length == 1 && argsArray[0] == "")
+            {
+                argsArray = [];
+            }
+            var ret = new VArray();
+            bool notEnfored = dataTypes==null;
+            int i = 0;
+            if(!notEnfored&&argsArray.Length!=dataTypes!.Length){
+                return null;
+            }
+            foreach (var arg in argsArray)
+            {
+                if(notEnfored)
+                    ret.Add(ExpressionEval.Evaluate(arg));
+                else
+                    ret.Add(ExpressionEval.Evaluate(arg,dataTypes![i]));
+                i++;
+            }
+            return ret;
+        }
 
         public static Dictionary<string, V_Variable> GetAllVars()
         {
-            Dictionary<string, V_Variable> vars =[ ];
+            Dictionary<string, V_Variable> vars = [];
             foreach (var Context in Interpreter.GetCurrentFrame().ScopeStack)
             {
                 foreach (var kv in Context.Variables)
@@ -185,22 +210,24 @@ namespace Vortex
             }
             return vars;
         }
+
         public static CustomAttributeTypedArgument GetStatementAttribute(MethodInfo statement, StatementAttributes index)
         {
             return statement.CustomAttributes.ToList()[0].ConstructorArguments[(int)index];
         }
-        public static CustomAttributeTypedArgument GetStatementAttribute<T>(MethodInfo statement,int index)
+        public static CustomAttributeTypedArgument GetStatementAttribute<T>(MethodInfo statement, int index)
         {
-            return statement.CustomAttributes.ToList().Find(x=>x.AttributeType==typeof(T)).ConstructorArguments[index];
+            return statement.CustomAttributes.ToList().Find(x => x.AttributeType == typeof(T)).ConstructorArguments[index];
         }
         public static bool IsIdentifierValid(string identifier)
         {
-            if(Interpreter.keywords.Contains(identifier))return false;
+            if (Interpreter.keywords.Contains(identifier)) return false;
             string pattern = @"^[a-zA-Z_🌋][a-zA-Z0-9_🌀🌋]*$";
             Regex regex = new(pattern);
             return regex.IsMatch(identifier);
         }
-        public static object CastToCSharpType(DataType type,string value){
+        public static object CastToCSharpType(DataType type, string value)
+        {
             return type switch
             {
                 DataType.String => value,
@@ -208,10 +235,12 @@ namespace Vortex
                 DataType.Bool => value == "True",
                 DataType.Unset => null,
                 DataType.Int => 0,
+                DataType.Array => ArgsEval(value,','),
                 _ => null,
             };
         }
-        public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method){
+        public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method)
+        {
             return method.GetParameters().Select(x => new VFuncArg(x.Name)).ToArray();
         }
 

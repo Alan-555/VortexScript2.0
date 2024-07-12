@@ -6,7 +6,7 @@
             string file;
             if(args.Length == 0){
                 file = InteractiveTermMode;
-                file = "script.vort";
+                //file = "script.vort";
             }  
             else{
                 file = args[0];

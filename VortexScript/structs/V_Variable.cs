@@ -6,8 +6,14 @@ namespace Vortex{
         public bool unsetable;
         public bool readonly_ = false;
         public V_Variable(DataType type, object value,bool unsetable = false,bool readonly_ = false){
-            this.type = type;
-            this.value = value;
+            if(value is double v && double.IsInfinity(v)){
+                this.type = DataType.NaN;
+                this.value = "NaN";
+            }
+            else{
+                this.type = type;
+                this.value = value;
+            }
             this.unsetable = unsetable;
             if(type==DataType.Unset)
                 this.value = "unset";
@@ -25,6 +31,8 @@ namespace Vortex{
         Bool = 2,
         Unset = 3,
         Any = 4,
-        Int = 5
+        Int = 5,
+        NaN = 6,
+        Array = 7
     }
 }

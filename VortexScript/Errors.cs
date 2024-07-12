@@ -56,7 +56,7 @@ namespace Vortex{
         }
     }
 
-    public class VariableAlreadyDeclaredError(params string[] args): VortexError("A variable with the identifier '{0}' has already been declared in the current scope",args);
+    public class IdentifierAlreadyUsedError(params string[] args): VortexError("The identifier '{0}' has already been used in the current context",args);
     public class DuplicateVariableError(params string[] args): VortexError("A variable with the identifier '{0}' is a duplicate.",args);
     public class IlegalStatementContextError(params string[] args) : VortexError("The statement '{0}' is not valid in the current context. ({1})",args);
     public class ScopeLeakError(params string[] args) : VortexError("The scope that began on line {0} has leaked.",args);
@@ -74,6 +74,9 @@ namespace Vortex{
     public class ModuleAlreadyLoadedError(params string[] args) : VortexError("Module '{0}' has already been loaded",args);
     public class AssigmentToReadonlyVarError(params string[] args) : VortexError("Variable '{0}' is read-only",args);
     public class UseOfAReservedNameError(params string[] args) : VortexError("Name '{0}' is reserved and cannot be used!",args);
+    public class ArgumentError(params string[] args) : VortexError("{0}",args);
+    public class IlegalOperationError(params string[] args) : VortexError("{0}",args);
+    public class IndexOutOfBoundsError(params string[] args) : VortexError("Index '{0}' was outside of the Indexeble's bounds.",args);
     
     
     

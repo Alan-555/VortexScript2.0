@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Vortex;
 namespace Vorteval
@@ -39,6 +40,7 @@ namespace Vorteval
             {DataType.None,typeof(object)},
             {DataType.Any,typeof(object)},
             {DataType.Int,typeof(int)},
+            {DataType.Array,typeof(Array)},
 
         };
         public static readonly Dictionary<Type, DataType> CsharpToVortex = new(){
@@ -46,6 +48,7 @@ namespace Vorteval
             {typeof(int),DataType.Number},
             {typeof(double),DataType.Number},
             {typeof(bool),DataType.Bool},
+            {typeof(Array),DataType.Array},
 
         };
         public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
@@ -55,6 +58,8 @@ namespace Vorteval
             {DataType.Unset,TokenType.Unset},
              {DataType.None,TokenType.Unset},
              {DataType.Any,TokenType.Any},
+             {DataType.NaN,TokenType.NaN},
+             {DataType.Array,TokenType.String},
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -63,6 +68,8 @@ namespace Vorteval
             {TokenType.Bool,DataType.Bool},
             {TokenType.Unset,DataType.Unset},
             {TokenType.Any,DataType.Any},
+            {TokenType.NaN,DataType.NaN},
+            {TokenType.Array,DataType.Array},
 
         };
 
@@ -156,6 +163,13 @@ namespace Vorteval
             //proccess variables
             tokens = ProccessVariables(tokens);
             tokens.RemoveAll(x => x.type == TokenType.Ignore);
+            for(int i =0; i < tokens.Count;i++){
+                var token = tokens[i];
+                if(token.type!=TokenType.Indexer)
+                    continue;
+                var prevToken = tokens[i - 1];
+                //TODO: finish
+            }
             //process operands and operators
             for (int i = 0; i < HighestPrecedence + 1; i++)
             {
@@ -384,7 +398,7 @@ namespace Vorteval
             switch (token.type)
             {
                 case TokenType.Number:
-                    return double.Parse(token.value);
+                    return double.Parse(token.value, CultureInfo.InvariantCulture);
                 case TokenType.String:
                     return token.value;
                 case TokenType.Bool:
@@ -464,15 +478,41 @@ namespace Vorteval
                         {
                             string trucknated = expression[(i - currentToken.Length)..];
                             int end = Utils.StringLastIndexOf(trucknated, ')');
+                            if (end == -1)
+                                throw new ExpectedTokenError(")");
                             var callFunctionStatement = trucknated[0..(end + 1)];
                             tokens.Add(new(TokenType.Function, callFunctionStatement));
-                            i = i - currentToken.Length + callFunctionStatement.Length;
+                            i = i - currentToken.Length + callFunctionStatement.Length - 1;
                             currentToken.Clear();
                             readingVar = false;
                             if (i >= expression.Length)
                             {
                                 break;
                             }
+                            continue;
+                        }
+                        else
+                        if (c == '[' && readingVar)
+                        {
+                            string trucknated = expression[i..];
+                            int end = Utils.StringLastIndexOf(trucknated, ']');
+                            if (end == -1)
+                                throw new ExpectedTokenError("]");
+                            var index_ = trucknated[1..end];
+                            int index = Convert.ToInt32((double)ExpressionEval.Evaluate(index_,DataType.Number).value);
+                            if(!Interpreter.ReadVar(currentToken.ToString(),out var value)){
+                                throw new UnknownNameError(currentToken.ToString());
+                            }
+                            tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
+                            tokens.Add(new(TokenType.Indexer,index.ToString()));
+                            i = end+2;
+                            currentToken.Clear();
+                            readingVar = false;
+                            if (i >= expression.Length)
+                            {
+                                break;
+                            }
+                            continue;
                         }
                         else
                         if (readingVar)
@@ -526,6 +566,22 @@ namespace Vorteval
                     {
 
                         tokens.Add(new Token(TokenType.Scope, c.ToString()));
+                    }
+                    else if (c == '[')
+                    {
+                        string arrayInit = expression[i..][1..];
+                        int end = Utils.StringLastIndexOf(arrayInit, ']');
+                        if(end==-1){
+                            continue;
+                        }
+                        arrayInit = arrayInit[..end];
+                        tokens.Add(new Token(TokenType.Array, arrayInit));
+                        i = end + 1;
+                        if (i >= expression.Length)
+                        {
+                            break;
+                        }
+                        continue;
                     }
 
                     else if (c == '"')
@@ -658,6 +714,9 @@ namespace Vorteval
         Console_in = 8,
         Any = 9,
         Module = 10,
+        NaN = 11,
+        Array = 12,
+        Indexer = 13,
         Ignore = 100,
 
         Unknown = -1 //  some garbage

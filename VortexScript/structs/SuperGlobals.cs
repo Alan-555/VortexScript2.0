@@ -53,12 +53,24 @@ namespace Vortex
 
         [InternalFunc(DataType.Number)]
         public static double Random(double a, double b){
-            return new Random().Next((int)b)+(int)a;
+            PreRandom((int)a,(int)b);
+            return random.Next((int)b-(int)a)+(int)a;
+        }
+        [InternalFunc(DataType.Number)]
+        public static double RandomRange(double a, double b){
+            PreRandom(a,b);
+            return random.NextDouble()*(b-a)+a;
+        }
+        public static void PreRandom(double a, double b){
+            if(a>=b||a<0){
+                throw new ArgumentError("Lower limit must be higher than 0 and lower than upper limit.");
+            }
+            random ??= new();
         }
 
         [InternalFunc(DataType.Unset)]
-        public static void SetSeed(int a){
-            random = new(a);
+        public static void SetSeed(double a){
+            random = new((int)a);
         }
     }
      public  class InternalStd : InternalModule{
