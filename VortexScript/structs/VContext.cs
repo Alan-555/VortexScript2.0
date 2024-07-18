@@ -2,6 +2,7 @@ namespace Vortex
 {
     public class VContext
     {
+        public string Name{get;set;} = "";
         public Dictionary<string, V_Variable> Variables {set; get;} //Local variables
         public Dictionary<string, VFunc> Functions {private set; get;}
         public int Depth {private set; get;} //How deep we are

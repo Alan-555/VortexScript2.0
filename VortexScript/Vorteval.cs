@@ -41,14 +41,7 @@ namespace Vorteval
             {DataType.Any,typeof(object)},
             {DataType.Int,typeof(int)},
             {DataType.Array,typeof(Array)},
-
-        };
-        public static readonly Dictionary<Type, DataType> CsharpToVortex = new(){
-            {typeof(string),DataType.String},
-            {typeof(int),DataType.Number},
-            {typeof(double),DataType.Number},
-            {typeof(bool),DataType.Bool},
-            {typeof(Array),DataType.Array},
+            {DataType.Module,typeof(object)},
 
         };
         public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
@@ -56,10 +49,12 @@ namespace Vorteval
             {DataType.Number,TokenType.Number},
             {DataType.Bool,TokenType.Bool},
             {DataType.Unset,TokenType.Unset},
-             {DataType.None,TokenType.Unset},
+             {DataType.None,TokenType.None},
              {DataType.Any,TokenType.Any},
              {DataType.NaN,TokenType.NaN},
              {DataType.Array,TokenType.String},
+             {DataType.Module,TokenType.Module},
+             {DataType.Type,TokenType.Type},
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -70,6 +65,9 @@ namespace Vorteval
             {TokenType.Any,DataType.Any},
             {TokenType.NaN,DataType.NaN},
             {TokenType.Array,DataType.Array},
+            {TokenType.None,DataType.None},
+            {TokenType.Module,DataType.Module},
+            {TokenType.Type,DataType.Type},
 
         };
 
@@ -114,6 +112,7 @@ namespace Vorteval
             {"n==s", new("==",DataType.Number, DataType.String, (a,b) => a.ToString() == b, 5,DataType.Bool) },
             {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 5,DataType.Bool) },
             {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
+            {"a==a", new("==",DataType.Any, DataType.Any, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
 
             //bitwise
             { "n&n", new("&",DataType.Number, DataType.Number, (a, b) => a & b, 6,DataType.Number) },
@@ -154,18 +153,29 @@ namespace Vorteval
                     int start = scope.From - dist;
                     int end = scope.To - dist;
                     var expression = tokens[(start + 1)..end];
+                    if(expression.Count==0)
+                        throw new ExpressionEvalError(new(){originalExpression=""},"Empty expression");
                     var result = RecursiveEval(expression);
                     tokens.RemoveRange(start, end - start + 1);
-                    tokens.Insert(start, new(DataTypeToToken[result.type], result.value.ToString()));
+                    tokens.Insert(start, new(DataTypeToToken[result.type], result.ToString()));
                     dist = end - start;
                 }
+            }
+            var scopeTest = tokens.Find(x => x.type == TokenType.Scope);
+            if (!scopeTest.Equals(default(Token))){
+                if(scopeTest.value=="(")
+                    throw new ExpectedTokenError(")");
+                else
+                    throw new UnexpectedTokenError(")");
+
             }
             //proccess variables
             tokens = ProccessVariables(tokens);
             tokens.RemoveAll(x => x.type == TokenType.Ignore);
-            for(int i =0; i < tokens.Count;i++){
+            for (int i = 0; i < tokens.Count; i++)
+            {
                 var token = tokens[i];
-                if(token.type!=TokenType.Indexer)
+                if (token.type != TokenType.Indexer)
                     continue;
                 var prevToken = tokens[i - 1];
                 //TODO: finish
@@ -190,9 +200,9 @@ namespace Vorteval
                 throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens) + ") apeared after proccessing. Are you missing an operator or an operand?");
             }
             var dataType = TokenToDataType[tokens[0].type];
-            var value_ = tokens[0].value;
-            var value = Utils.CastToCSharpType(dataType, value_);
-            return new(dataType, value);
+            var value = tokens[0].value;
+            var vVar = V_Variable.Construct(dataType, value, new() { readonly_ = true });
+            return vVar;
         }
         public List<Token> ProccessVariables(List<Token> tokens)
         {
@@ -203,11 +213,19 @@ namespace Vorteval
                 if (tokens[i].type == TokenType.Variable)
                 {
                     bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module, module != null);
+                    if(module!=null)
+                        tokens[i-1] = new(TokenType.Ignore, "");
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
                     }
-                    tokens[i] = new(DataTypeToToken[variable.type], variable.value.ToString());
+                    //TODO: look for more indexers into the future (x[0][0])
+                    if(i!=tokens.Count-1&&tokens[i+1].type == TokenType.Indexer){
+                        var index = ExpressionEval.Evaluate(tokens[i+1].value,DataType.Number);
+                        variable = variable.Index(Convert.ToInt32(index.value)); 
+                        tokens[i+1] = new(TokenType.Ignore,"");
+                    }
+                    tokens[i] = new(DataTypeToToken[variable.type], variable.ToString());
                 }
                 else if (tokens[i].type == TokenType.Console_in)
                 {
@@ -225,13 +243,15 @@ namespace Vorteval
                 else if (tokens[i].type == TokenType.Function)
                 {
                     Interpreter.CallFunctionStatement(tokens[i].value, out var res, module);
+                    if(module!=null)
+                        tokens[i-1] = new(TokenType.Ignore, "");
                     if (res == null)
                     {
                         tokens[i] = new(TokenType.Unset, "unset");
                     }
                     else
                     {
-                        tokens[i] = new(DataTypeToToken[res.Value.type], res.Value.value.ToString());
+                        tokens[i] = new(DataTypeToToken[res.type], res.value.ToString());
                     }
                     module = null;
                 }
@@ -241,7 +261,6 @@ namespace Vorteval
                     if (Interpreter.TryGetModule(tokens[i].value, out module))
                     {
                         moduleName = tokens[i].value;
-                        tokens[i] = new(TokenType.Ignore, "");
                     }
                     else
                     {
@@ -395,14 +414,17 @@ namespace Vorteval
 
         public object TokenToPrimitive(Token token)
         {
+            return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
             switch (token.type)
             {
                 case TokenType.Number:
-                    return double.Parse(token.value, CultureInfo.InvariantCulture);
+                    return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
+                case TokenType.Array:
+                    return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
                 case TokenType.String:
                     return token.value;
                 case TokenType.Bool:
-                    return token.value == "True";
+                    return token.value == "true";
                 case TokenType.Unset:
                     return null;
                 default:
@@ -492,29 +514,6 @@ namespace Vorteval
                             continue;
                         }
                         else
-                        if (c == '[' && readingVar)
-                        {
-                            string trucknated = expression[i..];
-                            int end = Utils.StringLastIndexOf(trucknated, ']');
-                            if (end == -1)
-                                throw new ExpectedTokenError("]");
-                            var index_ = trucknated[1..end];
-                            int index = Convert.ToInt32((double)ExpressionEval.Evaluate(index_,DataType.Number).value);
-                            if(!Interpreter.ReadVar(currentToken.ToString(),out var value)){
-                                throw new UnknownNameError(currentToken.ToString());
-                            }
-                            tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
-                            tokens.Add(new(TokenType.Indexer,index.ToString()));
-                            i = end+2;
-                            currentToken.Clear();
-                            readingVar = false;
-                            if (i >= expression.Length)
-                            {
-                                break;
-                            }
-                            continue;
-                        }
-                        else
                         if (readingVar)
                         {
                             tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
@@ -569,19 +568,40 @@ namespace Vorteval
                     }
                     else if (c == '[')
                     {
-                        string arrayInit = expression[i..][1..];
-                        int end = Utils.StringLastIndexOf(arrayInit, ']');
-                        if(end==-1){
+                        if (tokens.Count != 0 && tokens[^1].type != TokenType.Operator)
+                        {
+                            //indexer
+                            string trucknated = expression[i..];
+                            int end = Utils.StringGetMatchingSquarePer(trucknated);
+                            if (end == -1)
+                                throw new ExpectedTokenError("]");
+                            var index = trucknated[1..end];
+                            tokens.Add(new(TokenType.Indexer, index.ToString()));
+                            i += end;
+                            if (i+1 >= expression.Length)
+                            {
+                                break;
+                            }
                             continue;
                         }
-                        arrayInit = arrayInit[..end];
-                        tokens.Add(new Token(TokenType.Array, arrayInit));
-                        i = end + 1;
-                        if (i >= expression.Length)
+                        else
                         {
-                            break;
+                            //array init
+                            string arrayInit = expression[i..][1..];
+                            int end = Utils.StringLastIndexOf(arrayInit, ']');
+                            if (end == -1)
+                            {
+                                continue;
+                            }
+                            arrayInit = arrayInit[..end];
+                            tokens.Add(new Token(TokenType.Array, arrayInit));
+                            i = end + 1;
+                            if (i >= expression.Length)
+                            {
+                                break;
+                            }
+                            continue;
                         }
-                        continue;
                     }
 
                     else if (c == '"')
@@ -717,6 +737,8 @@ namespace Vorteval
         NaN = 11,
         Array = 12,
         Indexer = 13,
+        None = 14,
+        Type = 15,
         Ignore = 100,
 
         Unknown = -1 //  some garbage

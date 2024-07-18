@@ -1,0 +1,27 @@
+namespace Vortex
+{
+    public abstract class VortexType{
+        public abstract object ConvertToCSharpType(string v);
+        public abstract object CastToCSharpType(V_Variable v);
+        public abstract string ToString(V_Variable v);
+    }
+
+    public class VT_Number : VortexType
+    {
+        public override double CastToCSharpType(V_Variable v)
+        {
+            return (double)v.value;
+        }
+
+        public override object ConvertToCSharpType(string v)
+        {
+            return double.Parse(v);
+        }
+
+        public override string ToString(V_Variable v)
+        {
+            return v.value.ToString();
+        }
+    }
+
+}

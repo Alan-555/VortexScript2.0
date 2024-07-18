@@ -4,24 +4,24 @@ namespace Vortex
     public static class SuperGlobals
     {
         public static Dictionary<string, Func<V_Variable>> SuperGlobalVars { get; private set; } = new(){
-            {"true", ()=>new V_Variable(DataType.Bool,true)},
-            {"false", ()=>new V_Variable(DataType.Bool,false)},
-            {"unset",()=>new V_Variable(DataType.Unset,"")},
-            {"🌀",()=>new V_Variable(DataType.String,"Vortex script v. "+Interpreter.version)},
-            {"this",()=>new V_Variable(DataType.String,Interpreter.GetCurrentFrame().VFile.GetFileName())},
-            {"_frame",()=>new V_Variable(DataType.String,Interpreter.GetCurrentFrame().Name)},
-            {"_depth",()=>new V_Variable(DataType.Number,Interpreter.GetCurrentContext().Depth)},
-            {"_line",()=>new V_Variable(DataType.Number,Interpreter.GetCurrentFrame().currentLine)},
-            {"none",()=>new V_Variable(DataType.None,"None")},
-            {"any",()=>new V_Variable(DataType.Any,"Any")},
+            {"true", ()=>V_Variable.Construct(DataType.Bool,true)},
+            {"false", ()=>V_Variable.Construct(DataType.Bool,false)},
+            {"unset",()=>V_Variable.Construct(DataType.Unset,"")},
+            {"🌀",()=>V_Variable.Construct(DataType.String,"Vortex script v. "+Interpreter.version)},
+            {"this",()=>V_Variable.Construct(DataType.String,Interpreter.GetCurrentFrame().VFile.GetFileName())},
+            {"_frame",()=>V_Variable.Construct(DataType.String,Interpreter.GetCurrentFrame().Name)},
+            {"_depth",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentContext().Depth)},
+            {"_line",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentFrame().currentLine)},
+            {"none",()=>V_Variable.Construct(DataType.None,"none")},
+            {"any",()=>V_Variable.Construct(DataType.Any,"any")},
         };
 
         //Math
         
     }
     public  class InternalMath : InternalModule{
-        public static readonly V_Variable Pi = new(DataType.Number,Math.PI);
-        public static readonly V_Variable E = new(DataType.Number,Math.E);
+        public static readonly V_Variable Pi = V_Variable.Construct(DataType.Number,Math.PI);
+        public static readonly V_Variable E = V_Variable.Construct(DataType.Number,Math.E);
 
         [InternalFunc(DataType.Number)]
         public static double Max(double a, double b){

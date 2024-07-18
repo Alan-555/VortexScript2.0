@@ -6,12 +6,15 @@ namespace Vortex
     public class Interpreter
     {
         //Config
-        public static readonly int maxDepth = 512;
+        public static readonly int maxDepth = 256;
         public static readonly string version = "beta 1.0.0";
         public static readonly bool debug = false;
 
         public static bool itm = false;
 
+
+        //directives
+        public static bool DIR_BufferInput = false;
 
         //Internal stuff
         public static MethodInfo[] statements = [];
@@ -64,7 +67,7 @@ namespace Vortex
                 .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
                 .Select(mi => new VFunc(mi.Name, null, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
                 .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
-
+                var vv = V_Variable.Construct(DataType.Number, 3);
                 Dictionary<string, V_Variable> constants = new();
                 type.GetFields(BindingFlags.Public | BindingFlags.Static)
                 .ToList()
@@ -76,8 +79,15 @@ namespace Vortex
                         constants.Add(f.Name, val);
                     }
                 });
-                InternalModules.Add(type.Name[8..], new(constants, method, scopeType: ScopeTypeEnum.internal_));
+                InternalModules.Add(type.Name[8..], new(constants, method, scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
             }
+            //add types
+            var types = Enum.GetNames(typeof(DataType)).ToList();
+            foreach (var type in types)
+            {
+                SuperGlobals.SuperGlobalVars.Add(type,()=>V_Variable.Construct(DataType.Type,type));
+            }
+
         }
         public void ExecuteFile()
         {
@@ -86,6 +96,26 @@ namespace Vortex
                 itm = true;
                 while (true)
                 {
+                    if (GetCurrentContext().Depth != 0)
+                    {
+                        for (int i = 0; i < GetCurrentContext().Depth; i++)
+                        {
+                            Console.Write("｜");
+                            Console.Write("\t");
+                        }
+                        if (DirectiveDefinition<int>.DIR_BufferMode.value)
+                        {
+                            List<string> list = [];
+                            while (true)
+                            {
+                                var input = Console.ReadLine()!;
+                                if (input == "endbuffer")
+                                    break;
+                                list.Add(input);
+                            }
+                            ExecuteLines([.. list]);
+                        }
+                    }
                     ExecuteLines([Console.ReadLine()!]);
                 }
             }
@@ -145,6 +175,10 @@ namespace Vortex
             var func = GetCurrentContext().FuncBeingRead;
             if (func != null)
                 func.FunctionBody = [.. func.FunctionBody, line];
+            if (line == "endbuffer")
+            {
+                throw new IlegalOperationError("No buffer opened or not in ITM");
+            }
             ExecuteStatement(line);
 
         }
@@ -319,7 +353,8 @@ namespace Vortex
         {
             if (Utils.StringContains(statement, "="))
             {
-                if(statement.Length==1){
+                if (statement.Length == 1)
+                {
                     throw new ExpectedTokenError("identifier");
                 }
                 var middle = Utils.StringIndexOf(statement, "=");
@@ -341,7 +376,7 @@ namespace Vortex
                 string expression = statement[(middle + 1)..];
                 if (Utils.IsIdentifierValid(identifier))
                 {
-                    if ("+-*/.".Contains(special.ToString())&&OperToSpecialAssigment.TryGetValue(special.ToString(), out var spec))
+                    if ("+-*/.".Contains(special.ToString()) && OperToSpecialAssigment.TryGetValue(special.ToString(), out var spec))
                     {
                         return SetSpecial(identifier, ExpressionEval.Evaluate(expression), spec);
                     }
@@ -476,15 +511,17 @@ namespace Vortex
                     }
                 }
                 string args = statement[(argsStart + 1)..argsEnd];
-                var argsArray = Utils.ArgsEval(args,',',func.Args.Select(t=>t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, Utils.StringSplit(args,',').Length.ToString());
+                var argsArray = Utils.ArgsEval(args, ',', func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, Utils.StringSplit(args, ',').Length.ToString());
                 if (argsArray.Count != func.Args.Length)
                 {//TODO: defualt params
                     throw new FuncOverloadNotFoundError(func.Identifier, argsArray.Count.ToString());
                 }
                 Dictionary<string, V_Variable> argsList = [];
                 i = 0;
-                foreach (var arg in argsArray){
-                    argsList.Add(func.Args[i].name,arg);
+                foreach (var arg in argsArray)
+                {
+                    argsList.Add(func.Args[i].name, arg);
+                    i++;
                 }
                 val = CallFunction(func, argsList);
                 return true;
@@ -497,7 +534,27 @@ namespace Vortex
         {
             if (func.CSharpFunc != null)
             {
-                var args_ = args.Select(x => Utils.CastToCSharpType(x.Value.type, x.Value.value.ToString())).ToArray();
+                var args_ = args.Select(x => x.Value.value).ToArray();
+                int i = 0;
+                foreach (var arg in func.CSharpFunc.GetParameters())
+                {
+                    if (arg.ParameterType == typeof(string))
+                    {
+                        args_[i] = args_[i].ToString();
+                    }
+                    else if (arg.ParameterType == typeof(V_Variable))
+                    {
+                        args_[i] = args.ElementAt(i).Value;
+                    }
+                    else if(arg.ParameterType==typeof(bool)){
+                        args_[i] = (bool)args.ElementAt(i).Value.value==true;
+                    }
+                    else
+                    {
+                        args_[i] = args_[i];
+                    }
+                    i++;
+                }
                 object? val_ = null;
                 try
                 {
@@ -518,10 +575,11 @@ namespace Vortex
                 {
                     throw;
                 }
-                if(val_ is V_Variable v){
+                if (val_ is V_Variable v)
+                {
                     return v;
                 }
-                return new V_Variable(func.returnType, val_);
+                return V_Variable.Construct(func.returnType, val_);
             }
             NewFrame(func.File, ScopeTypeEnum.functionScope, func.StartLine + 1, func.GetFullPath());
             Interpreter funcInterpreter = new(func.File);
@@ -572,8 +630,8 @@ namespace Vortex
                     throw new UnexpectedEndOfStatementError("Expression");
                 }
                 var initVal = ExpressionEval.Evaluate(statement[(statement.IndexOf('=') + 1)..]);
-                initVal.unsetable = unsetable;
-                initVal.readonly_ = readonly_;
+                initVal.flags.unsetable = unsetable;
+                initVal.flags.readonly_ = readonly_;
                 bool failed = false;
 
                 if (!DeclareVar(identifier, initVal))
@@ -590,7 +648,7 @@ namespace Vortex
                 {
                     throw new IlegalDeclarationError("A read-only variable has to be initialized");
                 }
-                if (!DeclareVar(identifier, new(DataType.Unset, "unset", unsetable)))
+                if (!DeclareVar(identifier, V_Variable.Construct(DataType.Unset, "unset", new() { unsetable = unsetable })))
                 {
                     throw new IdentifierAlreadyUsedError(identifier);
                 }
@@ -600,7 +658,7 @@ namespace Vortex
         [MarkStatement(">", false)]
         public void OutputStatement(string statement)
         {
-            Console.WriteLine(ExpressionEval.Evaluate(statement[1..]).value);
+            Console.WriteLine(ExpressionEval.Evaluate(statement[1..]).ToString());
         }
 
         [MarkStatement("<", false)]
@@ -746,7 +804,40 @@ namespace Vortex
             ActiveModules.Remove(file);
         }
 
+        [MarkStatement("#", false)]
+        public void SetDirectiveStatement(string statement)
+        {
+            var directive = statement[1..].Split(' ');
+            if (directive.Length < 2)
+            {
+                throw new ExpectedTokenError("directive and value");
+            }
+            else if (directive.Length > 2)
+            {
+                throw new UnexpectedTokenError(directive[2]);
+            }
+            string directiveName = directive[0];
+            string value = directive[1];
+            var thing = DirectiveDefinition<int>.GetDirectiveField("DIR_" + directiveName[0].ToString().ToUpper() + directiveName[1..], out var type);
+            var value_ = ExpressionEval.Evaluate(value, type);
+            dynamic theDir = thing.GetValue(null);
+            var valueField = theDir.GetType().GetField("value", BindingFlags.Instance | BindingFlags.Public);
 
+            if (valueField != null && valueField.FieldType.IsAssignableFrom(value_.value.GetType()))
+            {
+                valueField.SetValue(theDir, value_.value);
+            }
+            else
+            {
+                throw new ArgumentException($"Value type mismatch: Expected {valueField.FieldType}, got {value.GetType()}");
+            }
+
+
+        }
+        public static T ConvertToGeneric<T>(object obj)
+        {
+            return (T)obj;
+        }
 
         // public static bool ReadVar(string identifier, out Variable val,Context? scope = null){
         //     scope ??= GetCurrentContext();
@@ -789,7 +880,7 @@ namespace Vortex
                 }
             }
 
-            if (!val.unsetable && val.type == DataType.Unset)
+            if (!val.flags.unsetable && val.type == DataType.Unset)
                 throw new ReadingUnsetValueError(identifier);
             return res;
         }
@@ -873,9 +964,9 @@ namespace Vortex
             {
                 if (Context.Variables.TryGetValue(identifier, out V_Variable old))
                 {
-                    if (old.readonly_)
+                    if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                    v.unsetable = old.unsetable;
+                    v.flags.unsetable = old.flags.unsetable;
                     Context.Variables[identifier] = v;
                     return true;
                 }
@@ -888,13 +979,15 @@ namespace Vortex
             {
                 if (Context.Variables.TryGetValue(identifier, out V_Variable old))
                 {
-                    if (old.readonly_)
+                    if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                    try{
+                    try
+                    {
                         (Context.Variables[identifier].value as VArray).Add(value);
                         return true;
                     }
-                    catch{
+                    catch
+                    {
                         return false;
                     }
                 }
@@ -907,21 +1000,21 @@ namespace Vortex
             {
                 if (Context.Variables.TryGetValue(identifier, out V_Variable old))
                 {
-                    if (old.readonly_)
+                    if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                    return(old.value as VArray).Remove(value);
+                    return (old.value as VArray).Remove(value);
                 }
             }
             return false;
         }
         public static bool SetSpecial(string identifier, V_Variable v, SpecialAssigment sa)
         {
-            V_Variable old = new();
+            V_Variable old = null;
             foreach (var Context in GetCurrentFrame().ScopeStack)
             {
                 if (Context.Variables.TryGetValue(identifier, out old))
                 {
-                    if (old.readonly_)
+                    if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
                 }
             }
@@ -949,15 +1042,18 @@ namespace Vortex
             }
             if (old.type == DataType.Array)
             {
-                if(oper=="+"){
-                    return ArrayAdd(identifier,v);
+                if (oper == "+")
+                {
+                    return ArrayAdd(identifier, v);
                 }
-                else if (oper=="-"){
-                    ArrayRemove(identifier,v);
+                else if (oper == "-")
+                {
+                    ArrayRemove(identifier, v);
                     return true;
                 }
-                else{
-                    throw new IlegalOperationError("Operator "+oper+" is not a valid array operator for compound assigment");
+                else
+                {
+                    throw new IlegalOperationError("Operator " + oper + " is not a valid array operator for compound assigment");
                 }
             }
             else

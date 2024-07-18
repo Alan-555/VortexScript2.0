@@ -135,13 +135,48 @@ namespace Vortex
             return matchIndex;
         }
 
+        public static int StringGetMatchingSquarePer(string input)
+        {
+            bool insideQuotes = false;
+            int inputLength = input.Length;
+            int matchIndex = -1;
+            int nested = 0; 
+
+            for (int i = 0; i < inputLength; i++)
+            {
+                char c = input[i];
+
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    continue;
+                }
+
+                if (!insideQuotes)
+                {
+                    if(c=='[')
+                        nested++;
+                    else
+                    if(c==']')
+                        nested--;
+
+                    if (c == ']'&&nested==0)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
+
         public static string[] StringSplit(string input, char delimiter)
         {
             List<string> result = new();
             StringBuilder currentString = new();
             bool insideQuotes = false;
             int nestedScope = 0;
-
+            int nestedScopeSquare = 0;
+            int i = 0;
             foreach (char c in input)
             {
                 if (c == '\"')
@@ -159,7 +194,18 @@ namespace Vortex
                     nestedScope--;
                     currentString.Append(')');
                 }
-                else if (c == delimiter && !insideQuotes && nestedScope == 0)
+                else if (c == '[')
+                {
+                    nestedScopeSquare++;
+
+                    currentString.Append('[');
+                }
+                else if (c == ']')
+                {
+                    nestedScopeSquare--;
+                    currentString.Append(']');
+                }
+                else if (c == delimiter && !insideQuotes && nestedScope == 0&&nestedScopeSquare==0)
                 {
                     result.Add(currentString.ToString());
                     currentString.Clear();
@@ -226,19 +272,7 @@ namespace Vortex
             Regex regex = new(pattern);
             return regex.IsMatch(identifier);
         }
-        public static object CastToCSharpType(DataType type, string value)
-        {
-            return type switch
-            {
-                DataType.String => value,
-                DataType.Number => double.Parse(value),
-                DataType.Bool => value == "True",
-                DataType.Unset => null,
-                DataType.Int => 0,
-                DataType.Array => ArgsEval(value,','),
-                _ => null,
-            };
-        }
+        
         public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method)
         {
             return method.GetParameters().Select(x => new VFuncArg(x.Name)).ToArray();
