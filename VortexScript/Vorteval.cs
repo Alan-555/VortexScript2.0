@@ -42,6 +42,8 @@ namespace Vorteval
             {DataType.Int,typeof(int)},
             {DataType.Array,typeof(Array)},
             {DataType.Module,typeof(object)},
+            {DataType.Indexer,typeof(int)}, 
+            {DataType.Type,typeof(string)}, 
 
         };
         public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
@@ -52,9 +54,10 @@ namespace Vorteval
              {DataType.None,TokenType.None},
              {DataType.Any,TokenType.Any},
              {DataType.NaN,TokenType.NaN},
-             {DataType.Array,TokenType.String},
+             {DataType.Array,TokenType.Array},
              {DataType.Module,TokenType.Module},
              {DataType.Type,TokenType.Type},
+             {DataType.Indexer,TokenType.Indexer},
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -68,6 +71,7 @@ namespace Vorteval
             {TokenType.None,DataType.None},
             {TokenType.Module,DataType.Module},
             {TokenType.Type,DataType.Type},
+            {TokenType.Indexer,DataType.Indexer},
 
         };
 
@@ -113,6 +117,9 @@ namespace Vorteval
             {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 5,DataType.Bool) },
             {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
             {"a==a", new("==",DataType.Any, DataType.Any, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
+            {"i==n", new("==",DataType.Indexer, DataType.Number, (a,b) => false, 5,DataType.Bool) },
+            {"t==t", new("==",DataType.Type, DataType.Type, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
+            
 
             //bitwise
             { "n&n", new("&",DataType.Number, DataType.Number, (a, b) => a & b, 6,DataType.Number) },
@@ -157,7 +164,7 @@ namespace Vorteval
                         throw new ExpressionEvalError(new(){originalExpression=""},"Empty expression");
                     var result = RecursiveEval(expression);
                     tokens.RemoveRange(start, end - start + 1);
-                    tokens.Insert(start, new(DataTypeToToken[result.type], result.ToString()));
+                    tokens.Insert(start, new(DataTypeToToken[result.type], result.ToString(), result.value));
                     dist = end - start;
                 }
             }
@@ -174,12 +181,20 @@ namespace Vorteval
             tokens.RemoveAll(x => x.type == TokenType.Ignore);
             for (int i = 0; i < tokens.Count; i++)
             {
-                var token = tokens[i];
-                if (token.type != TokenType.Indexer)
-                    continue;
-                var prevToken = tokens[i - 1];
-                //TODO: finish
+                if(i!=tokens.Count-1&&tokens[i+1].type == TokenType.Indexer){
+                        var index = ExpressionEval.Evaluate(tokens[i+1].value,DataType.Number);
+                        var variable = tokens[i].GetValVar();
+                        try{
+                            variable = variable.Index(Convert.ToInt32(index.value)); 
+                        }
+                        catch(OverflowException){
+                            throw new IndexOutOfBoundsError(index.ToString());
+                        }
+                        tokens[i] = new(TokenType.Ignore,"");
+                        tokens[i+1] = new(DataTypeToToken[variable.type],variable.ToString(),variable.value);
+                    }
             }
+            tokens.RemoveAll(x => x.type == TokenType.Ignore);
             //process operands and operators
             for (int i = 0; i < HighestPrecedence + 1; i++)
             {
@@ -200,6 +215,8 @@ namespace Vorteval
                 throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens,true) + ") apeared after proccessing. Are you missing an operator or an operand?");
             }
             var dataType = TokenToDataType[tokens[0].type];
+            if(tokens[0].actualValue!=null)
+                return V_Variable.Construct(dataType,tokens[0].actualValue!);
             var value = tokens[0].value;
             var vVar = V_Variable.Construct(dataType, value, new() { readonly_ = true });
             return vVar;
@@ -219,13 +236,8 @@ namespace Vorteval
                     {
                         throw new UnknownNameError(tokens[i].value);
                     }
-                    //TODO: look for more indexers into the future (x[0][0])
-                    if(i!=tokens.Count-1&&tokens[i+1].type == TokenType.Indexer){
-                        var index = ExpressionEval.Evaluate(tokens[i+1].value,DataType.Number);
-                        variable = variable.Index(Convert.ToInt32(index.value)); 
-                        tokens[i+1] = new(TokenType.Ignore,"");
-                    }
-                    tokens[i] = new(DataTypeToToken[variable.type], variable.ToString());
+
+                    tokens[i] = new(DataTypeToToken[variable.type], variable.ToString(),variable.value);
                 }
                 else if (tokens[i].type == TokenType.Console_in)
                 {
@@ -251,7 +263,7 @@ namespace Vorteval
                     }
                     else
                     {
-                        tokens[i] = new(DataTypeToToken[res.type], res.value.ToString());
+                        tokens[i] = new(DataTypeToToken[res.type], res.ToString(),res.value);
                     }
                     module = null;
                 }
@@ -268,12 +280,19 @@ namespace Vorteval
                     }
 
                 }
+                else if (tokens[i].type == TokenType.Array)
+                {
+                    var t = tokens[i];
+                    if(t.actualValue==null)
+                        tokens[i] = new(t.type, t.value,V_Variable.ConstructValue(DataType.Array,t.value));
+
+                }
             }
 
             return tokens;
 
         }
-        public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)
+        public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)//TODO: rewrite
         {
             int index = 0;
             bool modified = false;
@@ -367,7 +386,7 @@ namespace Vorteval
                         var val1 = tokens[leftI];
                         var result = val1.type != TokenType.Unset;
                         tokens.RemoveRange(leftI, 2);
-                        tokens.Insert(leftI, new(TokenType.Bool, result.ToString()));
+                        tokens.Insert(leftI, new(TokenType.Bool, result.ToString(),result));
                     }
                     else
                     if (oper.Oper == "§")
@@ -387,14 +406,14 @@ namespace Vorteval
                         var val2 = TokenToPrimitive(tokens[rightI]);
                         var result = oper.Func(0, val2);
                         tokens.RemoveRange(leftI + 1, 2);
-                        tokens.Insert(leftI + 1, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                        tokens.Insert(leftI + 1, new(DataTypeToToken[oper.ResultType], result.ToString(),result));
                     }
                     else
                     {
                         var val1 = TokenToPrimitive(tokens[leftI]);
                         var result = oper.Func(val1, 0);
                         tokens.RemoveRange(leftI, 2);
-                        tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                        tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString(),result));
                     }
                 }
                 else
@@ -415,21 +434,6 @@ namespace Vorteval
         public object TokenToPrimitive(Token token)
         {
             return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
-            switch (token.type)
-            {
-                case TokenType.Number:
-                    return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
-                case TokenType.Array:
-                    return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
-                case TokenType.String:
-                    return token.value;
-                case TokenType.Bool:
-                    return token.value == "true";
-                case TokenType.Unset:
-                    return null;
-                default:
-                    throw new ArgumentException("Token must be a value");
-            }
         }
 
         public string TokensToExpression(List<Token> tokens,bool seperate =false)
@@ -685,10 +689,26 @@ namespace Vorteval
         public TokenType type;
         public string value;
 
-        public Token(TokenType type, string value)
+        public object? actualValue;
+
+        public Token(TokenType type, string value,object? actualValue = null)
         {
             this.type = type;
             this.value = value;
+            this.actualValue = actualValue;
+            if(type==TokenType.String)
+                this.actualValue = value;
+        }
+
+        public readonly object GetVal(){
+            if (actualValue == null)
+                return V_Variable.Construct(Evaluator.TokenToDataType[type], value).value;
+            return actualValue;     
+        }
+        public readonly V_Variable GetValVar(){
+            if (actualValue != null)
+                return V_Variable.Construct(Evaluator.TokenToDataType[type], actualValue);
+            return V_Variable.Construct(Evaluator.TokenToDataType[type], value);
         }
     }
     public struct Operator

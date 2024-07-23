@@ -14,6 +14,8 @@ namespace Vortex
             {"_line",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentFrame().currentLine)},
             {"none",()=>V_Variable.Construct(DataType.None,"none")},
             {"any",()=>V_Variable.Construct(DataType.Any,"any")},
+            {"first",()=>V_Variable.Construct(DataType.Indexer,"0")},
+            {"last",()=>V_Variable.Construct(DataType.Indexer,"-1")},
         };
 
         //Math

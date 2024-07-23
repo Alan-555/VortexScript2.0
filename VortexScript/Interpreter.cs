@@ -551,6 +551,9 @@ namespace Vortex
                     else if(arg.ParameterType==typeof(bool)){
                         args_[i] = (bool)args.ElementAt(i).Value.value==true;
                     }
+                    else if(arg.ParameterType==typeof(int)){
+                        args_[i] = (int)Math.Floor((double)args.ElementAt(i).Value.value);
+                    }
                     else
                     {
                         args_[i] = args_[i];
@@ -845,6 +848,9 @@ namespace Vortex
 
 
         }
+
+        
+
         public static T ConvertToGeneric<T>(object obj)
         {
             return (T)obj;
@@ -978,6 +984,7 @@ namespace Vortex
                     if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
                     v.flags.unsetable = old.flags.unsetable;
+                    v.flags.readonly_ = old.flags.readonly_;
                     Context.Variables[identifier] = v;
                     return true;
                 }
@@ -1013,7 +1020,7 @@ namespace Vortex
                 {
                     if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                    return (old.value as VArray).Remove(value);
+                     (old.value as VArray).RemoveAll(x=>x.value.Equals(value.value));
                 }
             }
             return false;

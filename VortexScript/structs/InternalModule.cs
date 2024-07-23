@@ -30,6 +30,10 @@ namespace Vortex{
                 throw new InvalidFormatError(var,type.ToString());
             }
         }
+        [InternalFunc(DataType.Indexer)]
+        public static V_Variable Indexer(int val){
+            return V_Variable.Construct(DataType.Indexer,val);
+        }
 
     }
 

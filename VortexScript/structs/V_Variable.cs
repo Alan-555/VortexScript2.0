@@ -23,6 +23,7 @@ namespace Vortex
             { DataType.Any, typeof(VType_Any)},
             { DataType.Module, typeof(VType_Module)},
             { DataType.Type, typeof(VType_Type)},
+            { DataType.Indexer, typeof(VType_Indexer)},
         };
         public DataType type;
         public object value;
@@ -40,6 +41,10 @@ namespace Vortex
             var instance = (V_Variable)Activator.CreateInstance(type_, type, null, flags)!;
             instance.value = instance.ConvertToCSharpType(value);
             return instance;
+        }
+        public static object ConstructValue(DataType type, string value, V_VarFlags flags = default)
+        {
+            return Construct(type, value, flags).value;
         }
         protected V_Variable(DataType type, object value, V_VarFlags flags)
         {
@@ -96,8 +101,16 @@ namespace Vortex
         }
         public override V_Variable Index(int index)
         {
-            var v = Construct(type, ((string)value)[index], new() { readonly_ = true });
-            return v;
+            if(index<0)
+                index = ((string)value).Length + index;
+            try
+            {
+                return Construct(type, ((string)value)[index], new() { readonly_ = true });
+            }
+            catch (IndexOutOfRangeException)
+            {
+                throw new IndexOutOfBoundsError(index.ToString());
+            }
         }
     }
     public class VType_Bool : V_Variable
@@ -131,6 +144,8 @@ namespace Vortex
         }
         public override V_Variable Index(int index)
         {
+            if(index<0)
+                index = ((VArray)value).Count + index;
             var arr = (VArray)value;
             try
             {
@@ -225,6 +240,19 @@ namespace Vortex
             return value.ToString()!;
         }
     }
+    public class VType_Indexer : V_Variable
+    {
+        public VType_Indexer(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+        public override object ConvertToCSharpType(string v)
+        {
+           return double.Parse(v, CultureInfo.InvariantCulture); 
+        }
+
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
 
 
 
@@ -240,6 +268,7 @@ namespace Vortex
         Array = 7,
         Module = 8,
         Type = 9,
-        None = 10,
+        Indexer = 10,
+        None = 100,
     }
 }
