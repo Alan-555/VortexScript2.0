@@ -230,7 +230,6 @@ namespace Vortex
 
     public enum DataType
     {
-        None = -1,
         String = 0,
         Number = 1,
         Bool = 2,
@@ -240,6 +239,7 @@ namespace Vortex
         NaN = 6,
         Array = 7,
         Module = 8,
-        Type = 9
+        Type = 9,
+        None = 10,
     }
 }

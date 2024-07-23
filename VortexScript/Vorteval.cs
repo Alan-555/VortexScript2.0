@@ -197,7 +197,7 @@ namespace Vorteval
             }
             if (tokens.Count != 1)
             {
-                throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens) + ") apeared after proccessing. Are you missing an operator or an operand?");
+                throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens,true) + ") apeared after proccessing. Are you missing an operator or an operand?");
             }
             var dataType = TokenToDataType[tokens[0].type];
             var value = tokens[0].value;
@@ -432,13 +432,16 @@ namespace Vorteval
             }
         }
 
-        public string TokensToExpression(List<Token> tokens)
+        public string TokensToExpression(List<Token> tokens,bool seperate =false)
         {
             string expression = "";
             foreach (Token token in tokens)
             {
                 expression += token.value;
+                if(seperate)
+                    expression+=";";
             }
+            expression = expression[..^1];
             return expression;
         }
 
@@ -588,7 +591,8 @@ namespace Vorteval
                         {
                             //array init
                             string arrayInit = expression[i..][1..];
-                            int end = Utils.StringLastIndexOf(arrayInit, ']');
+                            int end = Utils.StringGetMatchingSquarePer("["+arrayInit);
+                            end--;
                             if (end == -1)
                             {
                                 continue;

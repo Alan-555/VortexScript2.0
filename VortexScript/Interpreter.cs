@@ -146,9 +146,11 @@ namespace Vortex
                 {
                     VortexError.ThrowError(e);
                 }
-                catch (Exception e)
+                catch (Exception)
                 {
-                    Console.WriteLine("An Interpreter error has occured. This is extraordinary and should not happen. Please report this error. The execution will now be halted. C# exception follows.");
+                    Console.Error.WriteLine("---------------Execution halted on internal exception---------------");
+                    Console.Error.WriteLine("An Interpreter error has occured, this event is extraordinary. Please report this error.");
+                    Console.Error.WriteLine("C# exception: ");
                     throw;
                 }
                 GetCurrentFrame().currentLine++;
@@ -603,7 +605,7 @@ namespace Vortex
             }
             bool unsetable = statement[1] == '?';
             bool readonly_ = statement[1] == '!';
-            bool unlink = statement[1] == '$';
+            bool unlink = statement[1] == '$'; //TODO: fix. WHen undeclaring in a scope the top level takes precesnde and is remove first
             if (unsetable || readonly_)
             {
                 statement = statement.Remove(1, 1);
@@ -655,6 +657,12 @@ namespace Vortex
             }
 
         }
+
+        [MarkStatement("#FAIL#", false)]
+        public void DebugFail(string statement)
+        {
+            throw new Exception("MANUAL FAIL TRIGGERED");
+        }
         [MarkStatement(">", false)]
         public void OutputStatement(string statement)
         {
@@ -677,6 +685,9 @@ namespace Vortex
         [MarkStatement("if", true, ScopeTypeEnum.ifScope)]
         public void IfStatement(string statement)
         {
+            if(statement.Length<4){
+                throw new UnexpectedEndOfStatementError("Expression");
+            }
             if (statement[2] != ' ')
             {
                 throw new ExpectedTokenError(" ");
@@ -763,7 +774,7 @@ namespace Vortex
             CallStack.Pop();
 
         }
-        [MarkStatement("safeacquire  ", false)]
+        [MarkStatement("safeacquire ", false)]
         public void AccessOnceStatement(string statement)
         {
             if (GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel)
