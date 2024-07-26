@@ -24,6 +24,9 @@ namespace Vortex
             { DataType.Module, typeof(VType_Module)},
             { DataType.Type, typeof(VType_Type)},
             { DataType.Indexer, typeof(VType_Indexer)},
+            { DataType.Error, typeof(VType_Error)},
+            { DataType.GroupType, typeof(VType_Tag)},
+            { DataType.Int, typeof(VType_Int)},
         };
         public DataType type;
         public object value;
@@ -81,6 +84,23 @@ namespace Vortex
                 return double.NaN;
             }
             return double.Parse(v, CultureInfo.InvariantCulture);
+        }
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
+
+    public class VType_Int : V_Variable
+    {
+        public VType_Int(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+        public override object ConvertToCSharpType(string v)
+        {
+            if (v == "∞" || v == "NaN")
+            {
+                throw new ArgumentError("Int may not be infinite or NaN");
+            }
+            return (double)Math.Floor(double.Parse(v, CultureInfo.InvariantCulture));
         }
         public override string ToString()
         {
@@ -191,7 +211,7 @@ namespace Vortex
         }
         public override string ToString()
         {
-            return "none";
+            return "unset";
         }
     }
 
@@ -231,7 +251,7 @@ namespace Vortex
         {
             var values = Enum.GetNames(typeof(DataType));
             if(!values.Contains(v))
-                throw new UnknownNameError(v);
+                throw new ArgumentError("Type must be one of " + string.Join(", ", values));
             return ((DataType)values.ToList().IndexOf(v)!);
         }
 
@@ -254,7 +274,42 @@ namespace Vortex
         }
     }
 
+    public class VType_Error : V_Variable
+    {
+        public VType_Error(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+        public override object ConvertToCSharpType(string v)
+        {
+           return new VortexError(v);
+        }
 
+        public override string ToString()
+        {
+            return ((VortexError)value).message;
+        }
+    }
+     public class VType_Tag : V_Variable
+    {
+        public VType_Tag(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+        public override object ConvertToCSharpType(string v)
+        {
+           return new GroupType("tag",v);
+        }
+
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
+    public struct GroupType(string groupName, object value)
+    {
+        public string groupName = groupName;
+        public object value = value;
+
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
 
     public enum DataType
     {
@@ -269,6 +324,8 @@ namespace Vortex
         Module = 8,
         Type = 9,
         Indexer = 10,
+        Error = 11,
+        GroupType = 12,
         None = 100,
     }
 }

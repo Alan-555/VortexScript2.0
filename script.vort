@@ -1,1 +1,3 @@
-$x = 5
+$x = error("error")
+throw x
+throw IlegalContextError "That is bad"

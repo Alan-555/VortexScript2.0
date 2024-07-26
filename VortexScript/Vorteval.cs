@@ -44,6 +44,8 @@ namespace Vorteval
             {DataType.Module,typeof(object)},
             {DataType.Indexer,typeof(int)}, 
             {DataType.Type,typeof(string)}, 
+            {DataType.Error,typeof(string)}, 
+            {DataType.GroupType,typeof(string)}, 
 
         };
         public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
@@ -58,6 +60,9 @@ namespace Vorteval
              {DataType.Module,TokenType.Module},
              {DataType.Type,TokenType.Type},
              {DataType.Indexer,TokenType.Indexer},
+             {DataType.Error,TokenType.Error},
+             {DataType.GroupType,TokenType.Tag}, 
+             {DataType.Int,TokenType.Int}, 
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -72,6 +77,9 @@ namespace Vorteval
             {TokenType.Module,DataType.Module},
             {TokenType.Type,DataType.Type},
             {TokenType.Indexer,DataType.Indexer},
+            {TokenType.Error,DataType.Error},
+            {TokenType.Tag,DataType.GroupType},
+            {TokenType.Int,DataType.Int},
 
         };
 
@@ -85,6 +93,7 @@ namespace Vorteval
             {"b~_", new("~",DataType.Bool,DataType.None,(a,b)=> a ? 1:0,0,DataType.Number,true)},
             {"n~_", new("~",DataType.Number,DataType.None,(a,b)=>a,0,DataType.Number,true)},
             {"a??_", new("??",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
+            {"n@_", new("@",DataType.Number,DataType.None,(a,b)=> Math.Floor(a),0,DataType.Int,true)},
             //multiplicative
             { "n*n", new("*",DataType.Number, DataType.Number, (a, b) => a * b, 1,DataType.Number) },
             { "n/n", new("/",DataType.Number, DataType.Number, (a, b) => a / b, 1,DataType.Number) },
@@ -230,13 +239,13 @@ namespace Vorteval
                 if (tokens[i].type == TokenType.Variable)
                 {
                     bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module, module != null);
+                    
                     if(module!=null)
                         tokens[i-1] = new(TokenType.Ignore, "");
                     if (!good)
                     {
                         throw new UnknownNameError(tokens[i].value);
                     }
-
                     tokens[i] = new(DataTypeToToken[variable.type], variable.ToString(),variable.value);
                 }
                 else if (tokens[i].type == TokenType.Console_in)
@@ -245,6 +254,8 @@ namespace Vorteval
                     {
                         throw new ExpressionEvalError(this, $"The module '{moduleName}' doe not contain a definition for ':'");
                     }
+                    if(Interpreter.itm)
+                        Console.Write(": ");
                     var in_ = Console.ReadLine();
                     if (in_ == "")
                         tokens[i] = new(TokenType.Unset, "");
@@ -292,7 +303,7 @@ namespace Vorteval
             return tokens;
 
         }
-        public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)//TODO: rewrite
+        public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)//TODO: rewrite, add generic support for int and make operators better
         {
             int index = 0;
             bool modified = false;
@@ -449,7 +460,7 @@ namespace Vorteval
             return expression;
         }
 
-        public List<Token> Tokenize(string expression)
+        public List<Token> Tokenize(string expression)//TODO: fix array(1)==[]
         {
             var tokens = new List<Token>();
             var currentToken = new StringBuilder();
@@ -506,7 +517,7 @@ namespace Vorteval
                         if (c == '(' && readingVar)
                         {
                             string trucknated = expression[(i - currentToken.Length)..];
-                            int end = Utils.StringLastIndexOf(trucknated, ')');
+                            int end = Utils.StringGetMatchingPer(trucknated);
                             if (end == -1)
                                 throw new ExpectedTokenError(")");
                             var callFunctionStatement = trucknated[0..(end + 1)];
@@ -763,6 +774,9 @@ namespace Vorteval
         Indexer = 13,
         None = 14,
         Type = 15,
+        Error = 16,
+        Tag = 17,
+        Int = 18,
         Ignore = 100,
 
         Unknown = -1 //  some garbage

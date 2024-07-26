@@ -8,18 +8,9 @@ namespace Vortex
         {
             expression =  expression.Trim();
             Evaluator ev = new();
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
+            var w = Utils.StartWatch();
             var result = ev.Evaluate(expression);
-            sw.Stop();
-            TimeSpan ts = sw.Elapsed;
-            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-            ts.Hours, ts.Minutes, ts.Seconds,
-            ts.Milliseconds / 10);
-            if(Interpreter.debug){
-                Console.WriteLine($"Expression '{expression}' took " + elapsedTime);
-
-            }
+            Utils.StopWatch(w, "Expression "+expression);
             /*ExpressionEvaluator eval = new(vars)
             {
                 OptionForceIntegerNumbersEvaluationsAsDoubleByDefault = true,

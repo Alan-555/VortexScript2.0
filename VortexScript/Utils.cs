@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -168,6 +169,39 @@ namespace Vortex
             }
             return -1;
         }
+        public static int StringGetMatchingPer(string input)
+        {
+            bool insideQuotes = false;
+            int inputLength = input.Length;
+            int matchIndex = -1;
+            int nested = 0; 
+
+            for (int i = 0; i < inputLength; i++)
+            {
+                char c = input[i];
+
+                if (c == '\"')
+                {
+                    insideQuotes = !insideQuotes; // Toggle the insideQuotes flag
+                    continue;
+                }
+
+                if (!insideQuotes)
+                {
+                    if(c=='(')
+                        nested++;
+                    else
+                    if(c==')')
+                        nested--;
+
+                    if (c == ')'&&nested==0)
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1;
+        }
 
         public static string[] StringSplit(string input, char delimiter)
         {
@@ -282,6 +316,22 @@ namespace Vortex
         public static void Swap<T>(IList<T> list, int indexA, int indexB)
         {
             (list[indexB], list[indexA]) = (list[indexA], list[indexB]);
+        }
+
+        public static Stopwatch? StartWatch(){
+            if(!Interpreter.debug) return null;
+            Stopwatch sw = new();
+            sw.Start();
+            return sw;
+        }
+        public static void StopWatch(Stopwatch? sw, string text){
+            if(sw==null) return;
+            sw.Stop();
+            TimeSpan ts = sw.Elapsed;
+            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+            ts.Hours, ts.Minutes, ts.Seconds,
+            ts.Milliseconds / 10);
+            Console.WriteLine($"Proccess '{text}' took " + elapsedTime);
         }
     }
 

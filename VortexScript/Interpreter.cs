@@ -67,7 +67,6 @@ namespace Vortex
                 .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
                 .Select(mi => new VFunc(mi.Name, null, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
                 .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
-                var vv = V_Variable.Construct(DataType.Number, 3);
                 Dictionary<string, V_Variable> constants = new();
                 type.GetFields(BindingFlags.Public | BindingFlags.Static)
                 .ToList()
@@ -85,7 +84,13 @@ namespace Vortex
             var types = Enum.GetNames(typeof(DataType)).ToList();
             foreach (var type in types)
             {
-                SuperGlobals.SuperGlobalVars.Add(type,()=>V_Variable.Construct(DataType.Type,type));
+                SuperGlobals.SuperGlobalVars.Add(type, () => V_Variable.Construct(DataType.Type, type));
+            }
+            //add errors
+            var errors = GetType().Assembly.GetTypes().Where(type => type.IsSubclassOf(typeof(VortexError)));
+            foreach (var error in errors)
+            {
+                SuperGlobals.SuperGlobalVars.Add(error.Name, () => { var x = (VType_Tag)V_Variable.Construct(DataType.GroupType, new GroupType("error", error)); return x; });
             }
 
         }
@@ -216,7 +221,15 @@ namespace Vortex
                         return;
                     }
                     else
-                        throw new UnknownStatementError(statement);
+                    {
+                        if (itm)
+                        {
+                            Console.WriteLine("> " + ExpressionEval.Evaluate(statement));
+                            return;
+                        }
+                        else
+                            throw new UnknownStatementError(statement);
+                    }
                 }
                 bool endsScope = (bool)Utils.GetStatementAttribute(statementToExec, StatementAttributes.endScope).Value!;
                 bool startsScope = (bool)Utils.GetStatementAttribute(statementToExec, StatementAttributes.mewScope).Value!;
@@ -526,6 +539,8 @@ namespace Vortex
                     i++;
                 }
                 val = CallFunction(func, argsList);
+                if(itm)
+                    Console.WriteLine("< "+val.value.ToString());
                 return true;
             }
             val = null;
@@ -548,12 +563,17 @@ namespace Vortex
                     {
                         args_[i] = args.ElementAt(i).Value;
                     }
-                    else if(arg.ParameterType==typeof(bool)){
-                        args_[i] = (bool)args.ElementAt(i).Value.value==true;
+                    else if (arg.ParameterType == typeof(bool))
+                    {
+                        args_[i] = (bool)args.ElementAt(i).Value.value == true;
                     }
-                    else if(arg.ParameterType==typeof(int)){
+                    else if (arg.ParameterType == typeof(int))
+                    {
                         args_[i] = (int)Math.Floor((double)args.ElementAt(i).Value.value);
                     }
+                    /*else if(((Type)args_[i]).IsSubclassOf(typeof(VortexError))){
+                         args_[i] = V_Variable.Construct(DataType.Error, args_[i]);
+                    }*/
                     else
                     {
                         args_[i] = args_[i];
@@ -688,7 +708,8 @@ namespace Vortex
         [MarkStatement("if", true, ScopeTypeEnum.ifScope)]
         public void IfStatement(string statement)
         {
-            if(statement.Length<4){
+            if (statement.Length < 4)
+            {
                 throw new UnexpectedEndOfStatementError("Expression");
             }
             if (statement[2] != ' ')
@@ -834,12 +855,11 @@ namespace Vortex
             string value = directive[1];
             var thing = DirectiveDefinition<int>.GetDirectiveField("DIR_" + directiveName[0].ToString().ToUpper() + directiveName[1..], out var type);
             var value_ = ExpressionEval.Evaluate(value, type);
-            dynamic theDir = thing.GetValue(null);
-            var valueField = theDir.GetType().GetField("value", BindingFlags.Instance | BindingFlags.Public);
-
+            var fieldValue = thing.GetValue(null);
+            var valueField = fieldValue.GetType().GetField("value", BindingFlags.Instance | BindingFlags.Public);
             if (valueField != null && valueField.FieldType.IsAssignableFrom(value_.value.GetType()))
             {
-                valueField.SetValue(theDir, value_.value);
+                valueField.SetValue(fieldValue, value_.value);
             }
             else
             {
@@ -849,7 +869,56 @@ namespace Vortex
 
         }
 
-        
+        [MarkStatement("raise ", false)]
+        public void ThrowStatement(string statement)
+        {
+            var args = Utils.StringSplit(statement, ' ')[1..];
+            if (args.Length == 2)
+            {
+                var type = ExpressionEval.Evaluate(args[0], DataType.GroupType);
+                var message = ExpressionEval.Evaluate(args[1], DataType.String);
+                InternalModule.ThrowError(type, message.value.ToString());
+            }
+            else if (args.Length == 1)
+            {
+                var error = ExpressionEval.Evaluate(args[0], DataType.Error);
+                throw (VortexError)error.value;
+            }
+            else
+            {
+                throw new UnexpectedTokenError(args[2]);
+            }
+        }
+
+        [MarkStatement("assert ", false)]//assert 5==5   assert 5 8
+        public void AssertStatement(string statement)
+        {
+            var args = Utils.StringSplit(statement, ' ')[1..];
+            if (args.Length == 2)
+            {
+                var val1 = ExpressionEval.Evaluate(args[0], DataType.Any);
+                var val2 = ExpressionEval.Evaluate(args[1], DataType.Any);
+                var value = val1.ToString() == val2.ToString();
+                if (!value)
+                {
+                    throw new AssertionFailedError(val1.ToString(), val2.ToString());
+                }
+            }
+            else if (args.Length == 1)
+            {
+                var value = (bool)ExpressionEval.Evaluate(args[0], DataType.Bool).value;
+                if (!value)
+                {
+                    throw new AssertionFailedError("true", "false");
+                }
+
+            }
+            else
+            {
+                throw new UnexpectedTokenError(args[2]);
+            }
+        }
+
 
         public static T ConvertToGeneric<T>(object obj)
         {
@@ -1020,7 +1089,7 @@ namespace Vortex
                 {
                     if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                     (old.value as VArray).RemoveAll(x=>x.value.Equals(value.value));
+                    (old.value as VArray).RemoveAll(x => x.value.Equals(value.value));
                 }
             }
             return false;
