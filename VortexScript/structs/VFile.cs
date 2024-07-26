@@ -20,11 +20,13 @@ namespace Vortex
                 FileFrame = new(this,0,"Acquired("+Path+")");
             }
             Interpreter.CallStack.Push(FileFrame);
-            TopLevelContext = new VContext([], [], 0, ScopeTypeEnum.topLevel)
+            TopLevelContext = new VContext([], this,0, ScopeTypeEnum.topLevel)
             {
-                IsMain = entrypoint
+                IsMain = entrypoint,
+                Name = GetFileName(),
+                
             };
-            if (!Interpreter.ActiveModules.TryAdd(GetFileName(),TopLevelContext)){
+            if (!Interpreter.ActiveModules.TryAdd(GetFileName()[0].ToString().ToUpper()+GetFileName()[1..],TopLevelContext)){
                 throw new ModuleAlreadyLoadedError(GetFileName());
             }
             FileFrame.ScopeStack.Push(TopLevelContext);
@@ -45,6 +47,10 @@ namespace Vortex
 
         public string GetFileName(){
             return Path.Split(".")[0];
+        }
+        public string GetFileNameUpper(){
+            var v = GetFileName();
+            return v[0].ToString().ToUpper()+v[1..];
         }
     }
 }

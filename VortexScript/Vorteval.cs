@@ -63,6 +63,7 @@ namespace Vorteval
              {DataType.Error,TokenType.Error},
              {DataType.GroupType,TokenType.Tag}, 
              {DataType.Int,TokenType.Int}, 
+             {DataType.Function,TokenType.Function}, 
 
         };
         public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
@@ -80,6 +81,7 @@ namespace Vorteval
             {TokenType.Error,DataType.Error},
             {TokenType.Tag,DataType.GroupType},
             {TokenType.Int,DataType.Int},
+            {TokenType.Function,DataType.Function}, 
 
         };
 
@@ -238,6 +240,8 @@ namespace Vorteval
             {
                 if (tokens[i].type == TokenType.Variable)
                 {
+                    if(module!=null&&tokens[i].value=="this")
+                        throw new IlegalOperationError("'this' can only be accessed via top-level context.");
                     bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module, module != null);
                     
                     if(module!=null)
@@ -280,7 +284,20 @@ namespace Vorteval
                 }
                 else if (tokens[i].type == TokenType.Module)
                 {
-
+                    if(tokens[i].value=="this"){
+                        module = Interpreter.GetCurrentFrame().VFile.TopLevelContext;
+                        continue;
+                    }
+                    
+                    try{
+                        if(Interpreter.ReadVar(tokens[i].value,out var mod_,module,type: DataType.Module)){
+                            if(module!=null)
+                                 tokens[i-1] = new(TokenType.Ignore, "");
+                            module = mod_!.value as VContext;
+                            continue;
+                        }
+                    }
+                    catch(UnmatchingDataTypeError){}
                     if (Interpreter.TryGetModule(tokens[i].value, out module))
                     {
                         moduleName = tokens[i].value;
@@ -698,7 +715,7 @@ namespace Vorteval
     public struct Token
     {
         public TokenType type;
-        public string value;
+        public string value="";
 
         public object? actualValue;
 

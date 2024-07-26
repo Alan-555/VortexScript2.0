@@ -1,3 +1,8 @@
-$x = error("error")
-throw x
-throw IlegalContextError "That is bad"
+array(a) :
+> a
+> _frame
+raise error("FUCK YOU")
+;
+
+> this
+$x = 1

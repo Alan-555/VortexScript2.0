@@ -33,7 +33,6 @@ namespace Vortex
 
         public static Stack<VFrame> CallStack { get; private set; } = [];
 
-
         //Instance    
         public VFile File { private set; get; }
 
@@ -46,7 +45,7 @@ namespace Vortex
 
         public void Init()
         {
-            statements = Assembly.GetAssembly(typeof(Interpreter)).GetTypes()
+            statements = Assembly.GetAssembly(typeof(Interpreter))!.GetTypes()
                       .SelectMany(t => t.GetMethods())
                       .Where(m => m.GetCustomAttributes(typeof(MarkStatement), false).Length > 0)
                       .ToArray();
@@ -60,6 +59,7 @@ namespace Vortex
                where typeof(InternalModule).IsAssignableFrom(type)
                select type).ToArray();
             //TODO: do not load in advance? Load dynamically?
+            bool first = true;
             foreach (var type in listOfBs)
             {
                 var method = type
@@ -67,7 +67,7 @@ namespace Vortex
                 .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
                 .Select(mi => new VFunc(mi.Name, null, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
                 .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
-                Dictionary<string, V_Variable> constants = new();
+                Dictionary<string, V_Variable> constants = [];
                 type.GetFields(BindingFlags.Public | BindingFlags.Static)
                 .ToList()
                 .ForEach(f =>
@@ -78,7 +78,18 @@ namespace Vortex
                         constants.Add(f.Name, val);
                     }
                 });
-                InternalModules.Add(type.Name[8..], new(constants, method, scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
+                foreach (var item in method)
+                {
+                    constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value));
+                }
+                if(first){
+                    foreach(var item in constants){
+                        SuperGlobals.SuperGlobalVars.Add(item.Key, ()=>item.Value);
+                    }
+                }
+
+                InternalModules.Add(type.Name[8..], new(constants,null,scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
+                first = false;
             }
             //add types
             var types = Enum.GetNames(typeof(DataType)).ToList();
@@ -224,7 +235,12 @@ namespace Vortex
                     {
                         if (itm)
                         {
-                            Console.WriteLine("> " + ExpressionEval.Evaluate(statement));
+                            try{
+                                Console.WriteLine("> " + ExpressionEval.Evaluate(statement));
+                            }
+                            catch{
+                                throw new UnknownStatementError(statement);
+                            }
                             return;
                         }
                         else
@@ -330,7 +346,7 @@ namespace Vortex
         public VContext OpenNewContext(ScopeTypeEnum type)
         {
 
-            var newC = new VContext([], [], GetCurrentFrame().ScopeStack.Count, type, StartLine: GetCurrentFrame().currentLine);
+            var newC = new VContext([],null,GetCurrentFrame().ScopeStack.Count, type, StartLine: GetCurrentFrame().currentLine);
             GetCurrentFrame().ScopeStack.Push(newC);
             return newC;
         }
@@ -360,7 +376,7 @@ namespace Vortex
         {
             if (!GetCurrentFrame().ScopeStack.TryPeek(out _))
             {
-                return new([], []);
+                return new([],null);
             }
             return GetCurrentFrame().ScopeStack.First();
         }
@@ -400,6 +416,9 @@ namespace Vortex
                     if (SetVar(identifier, ExpressionEval.Evaluate(expression)))
                     {
                         return true;
+                    }
+                    else{
+                        throw new UnknownNameError(identifier);
                     }
                 }
             }
@@ -467,7 +486,7 @@ namespace Vortex
             var func = GetCurrentContext().FuncBeingRead;
             func!.FunctionBody = func.FunctionBody[..^1];
             GetCurrentFrame().ScopeStack.Pop();
-            if (!GetCurrentContext().Functions.TryAdd(func.Identifier, func))
+            if (!DefineFunc(func.Identifier, func))
             {
                 throw new IdentifierAlreadyUsedError(func.Identifier);
             }
@@ -505,7 +524,8 @@ namespace Vortex
                 }
                 if (!Utils.IsIdentifierValid(identifier))
                 {
-                    throw new InvalidIdentifierError(identifier);
+                    val = null;
+                    return false;
                 }
                 if (module != "")
                 {
@@ -514,17 +534,12 @@ namespace Vortex
                         throw new UnknownNameError(module);
                     }
                 }
-                if (!ReadFunction(identifier, out var func, context))
+                if (!ReadVar(identifier, out var func_, context,type:DataType.Function))
                 {
-                    if (!ReadVar(identifier, out var x))
-                    {
-                        throw new UnknownNameError(identifier);
-                    }
-                    else
-                    {
-                        throw new UnmatchingDataTypeError(x.type.ToString(), "VFunc");
-                    }
+                    throw new UnknownNameError(identifier);
                 }
+                if (func_.value is not VFunc func)
+                    throw new InvalidCastException("Function is not a VFunc");
                 string args = statement[(argsStart + 1)..argsEnd];
                 var argsArray = Utils.ArgsEval(args, ',', func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, Utils.StringSplit(args, ',').Length.ToString());
                 if (argsArray.Count != func.Args.Length)
@@ -539,8 +554,11 @@ namespace Vortex
                     i++;
                 }
                 val = CallFunction(func, argsList);
-                if(itm)
-                    Console.WriteLine("< "+val.value.ToString());
+                if(itm){
+                    var val_ = val==null||val.value==null?"none":val.value;
+                    Console.WriteLine("< "+val_.ToString());
+
+                }
                 return true;
             }
             val = null;
@@ -737,7 +755,7 @@ namespace Vortex
         [MarkStatement("try :", true, scopeType: ScopeTypeEnum.tryScope)]
         public void TryScopeStartStement(string statement)
         {
-            GetCurrentContext().InTryStatement = true;
+            
 
         }
         [MarkStatement("catch :", true, scopeType: ScopeTypeEnum.catchScope, true)]
@@ -790,9 +808,14 @@ namespace Vortex
             }
             var file = statement[8..] + ".vort";
             VFile file_ = new(file);
+            
             if (!file_.Exists())
             {
                 throw new FileDoesNotExistError(file);
+            }
+            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper()+file_.GetFileName()[1..]))
+            {
+                throw new ModuleAlreadyLoadedError(file_.GetFileName());
             }
             file_.InterpretThisFile();
             CallStack.Pop();
@@ -805,12 +828,13 @@ namespace Vortex
             {
                 throw new IlegalStatementContextError("Safeacquire", GetCurrentContext().ScopeType.ToString()).SetInfo("Safeacquire statement may only be used at the top level");
             }
-            var file = statement[8..] + ".vort";
-            if (ActiveModules.ContainsKey(file))
+            var file = statement[12..] + ".vort";
+            VFile file_ = new(file);
+            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper()+file_.GetFileName()[1..]))
             {
                 return;
             }
-            VFile file_ = new(file);
+            
             if (!file_.Exists())
             {
                 throw new FileDoesNotExistError(file);
@@ -823,12 +847,16 @@ namespace Vortex
         public void UnloadStatement(string statement)
         {
             var file = statement[8..];
-
-            if (!ActiveModules.TryGetValue(file, out VContext? value))
+            VContext? value = null;
+            try{
+                value = (VContext)ExpressionEval.Evaluate(file,DataType.Module).value;
+            }
+            catch{}
+            if (value==null&&!ActiveModules.TryGetValue(file, out value))
             {
                 throw new UnknownNameError(file);
             }
-            if (GetCurrentFrame().VFile.GetFileName() == file)
+            if (GetCurrentFrame().VFile.TopLevelContext==value)
             {
                 throw new IlegalStatementContextError("Release", GetCurrentContext().ScopeType.ToString()).SetInfo("Cannot release the currently executed module");
             }
@@ -836,7 +864,8 @@ namespace Vortex
             {
                 throw new IlegalStatementContextError("Release", GetCurrentContext().ScopeType.ToString()).SetInfo("Cannot release the entrypoint module");
             }
-            ActiveModules.Remove(file);
+            ActiveModules.Remove(value.Name);
+            value.Destroy();
         }
 
         [MarkStatement("#", false)]
@@ -933,7 +962,7 @@ namespace Vortex
         //         throw new ReadingUnsetValue(identifier);
         //     return res;
         // }
-        public static bool ReadVar(string identifier, out V_Variable val, VContext? context = null, bool ignoreTopLevel = false)
+        public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, bool ignoreTopLevel = false,DataType type = DataType.Any)
         {
             Dictionary<string, V_Variable> vars;
             if (context == null)
@@ -944,21 +973,21 @@ namespace Vortex
             {
                 vars = context.Variables;
             }
-            if (SuperGlobals.SuperGlobalVars.TryGetValue(identifier, out var l))
-            {
-                val = l();
-                return true;
+            if(context==null){
+                if(TryGetSuperGlobal(identifier, out val, type))
+                    return true;
             }
+            
             var res = vars.TryGetValue(identifier, out val);
             if (!res)
             {
                 if (context?.ScopeType == ScopeTypeEnum.internal_ || ignoreTopLevel)
                 {
-                    return false;
+                    return TryGetSuperGlobal(identifier, out val, type);
                 }
                 if (!GetCurrentFrame().VFile.TopLevelContext.Variables.TryGetValue(identifier, out val))
                 {
-                    return false;
+                    return TryGetSuperGlobal(identifier, out val, type);
                 }
                 else
                 {
@@ -968,71 +997,24 @@ namespace Vortex
 
             if (!val.flags.unsetable && val.type == DataType.Unset)
                 throw new ReadingUnsetValueError(identifier);
+                if(type!=DataType.Any&&val.type != type)
+                    throw new UnmatchingDataTypeError(identifier, type.ToString());
             return res;
         }
-        public static bool ReadFunction(string identifier, out VFunc val, VContext? context = null, bool ignoreTopLevel = false)
-        {
-            /*if(SuperGlobals.TryGetValue(identifier, out  val)){
+        public static bool TryGetSuperGlobal(string identifier, out V_Variable? val, DataType type = DataType.Any){
+            if (SuperGlobals.SuperGlobalVars.TryGetValue(identifier, out var l))
+            {
+                val = l();
+                if(type!=DataType.Any&&val.type != type)
+                    throw new UnmatchingDataTypeError(val.type.ToString(), type.ToString());
                 return true;
-            }*/
-            Dictionary<string, VFunc> funcs;
-            if (context != null)
-            {
-                funcs = GetAllModuleFuncs(context);
             }
-            else
-            {
-                funcs = GetAllFunctions();
-            }
-            foreach (var item in InternalModules.First().Value.Functions)
-            {
-                funcs.TryAdd(item.Key, item.Value);
-            }
-            var res = funcs.TryGetValue(identifier, out val);
-            if (!res)
-            {
-                if (context?.ScopeType == ScopeTypeEnum.internal_ || ignoreTopLevel)
-                {
-                    return false;
-                }
-                if (!GetCurrentFrame().VFile.TopLevelContext.Functions.TryGetValue(identifier, out val))
-                {
-                    return false;
-                }
-                else
-                {
-                    res = true;
-                }
-            }
-            return res;
-        }
-        public static Dictionary<string, VFunc> GetAllFunctions()
-        {
-            var funcs = new Dictionary<string, VFunc> { };
-            foreach (var func in GetCurrentFrame().ScopeStack.Last().Functions)
-            {
-                funcs.Add(func.Key, func.Value);
-            }
-            foreach (var func in GetCurrentFrame().VFile.TopLevelContext.Functions)
-            {
-                funcs.TryAdd(func.Key, func.Value);
-            }
-            foreach (var func_ in ActiveModules)
-            {
-                foreach (var func in func_.Value.Functions)
-                {
-                    funcs.TryAdd(func.Key, func.Value);
-                }
-            }
-            return funcs;
+            val=null;
+            return false;
         }
         public static bool TryGetModule(string name, out VContext module)
         {
             return ActiveModules.TryGetValue(name, out module) || InternalModules.TryGetValue(name, out module);
-        }
-        public static Dictionary<string, VFunc> GetAllModuleFuncs(VContext module)
-        {
-            return module.Functions;
         }
         public bool SetVar(string identifier, V_Variable value, VContext? scope = null)
         {
@@ -1153,8 +1135,11 @@ namespace Vortex
 
         public static bool DeclareVar(string identifier, V_Variable var)
         {
-
             return GetCurrentContext().Variables.TryAdd(identifier, var);
+        }
+        public static bool DefineFunc(string identifier, VFunc var)
+        {
+            return DeclareVar(identifier,V_Variable.Construct(DataType.Function,var));
         }
         public static VFrame NewFrame(VFile file, ScopeTypeEnum scopeType, int lineOffset, string name)
         {
@@ -1163,7 +1148,7 @@ namespace Vortex
                 throw new StackOverflowError();
             }
             VFrame frame = new(file, lineOffset, name);
-            frame.ScopeStack.Push(new([], [], 0, scopeType, StartLine: GetCurrentFrame().currentLine));
+            frame.ScopeStack.Push(new([],file, 0, scopeType, StartLine: GetCurrentFrame().currentLine));
             CallStack.Push(frame);
             return frame;
         }

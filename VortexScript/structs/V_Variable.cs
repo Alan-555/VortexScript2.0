@@ -27,6 +27,7 @@ namespace Vortex
             { DataType.Error, typeof(VType_Error)},
             { DataType.GroupType, typeof(VType_Tag)},
             { DataType.Int, typeof(VType_Int)},
+            { DataType.Function, typeof(VType_Function)},
         };
         public DataType type;
         public object value;
@@ -121,7 +122,7 @@ namespace Vortex
         }
         public override V_Variable Index(int index)
         {
-            if(index<0)
+            if (index < 0)
                 index = ((string)value).Length + index;
             try
             {
@@ -164,7 +165,7 @@ namespace Vortex
         }
         public override V_Variable Index(int index)
         {
-            if(index<0)
+            if (index < 0)
                 index = ((VArray)value).Count + index;
             var arr = (VArray)value;
             try
@@ -250,7 +251,7 @@ namespace Vortex
         public override object ConvertToCSharpType(string v)
         {
             var values = Enum.GetNames(typeof(DataType));
-            if(!values.Contains(v))
+            if (!values.Contains(v))
                 throw new ArgumentError("Type must be one of " + string.Join(", ", values));
             return ((DataType)values.ToList().IndexOf(v)!);
         }
@@ -265,7 +266,7 @@ namespace Vortex
         public VType_Indexer(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
         public override object ConvertToCSharpType(string v)
         {
-           return double.Parse(v, CultureInfo.InvariantCulture); 
+            return double.Parse(v, CultureInfo.InvariantCulture);
         }
 
         public override string ToString()
@@ -279,7 +280,7 @@ namespace Vortex
         public VType_Error(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
         public override object ConvertToCSharpType(string v)
         {
-           return new VortexError(v);
+            return new VortexError(v);
         }
 
         public override string ToString()
@@ -287,12 +288,12 @@ namespace Vortex
             return ((VortexError)value).message;
         }
     }
-     public class VType_Tag : V_Variable
+    public class VType_Tag : V_Variable
     {
         public VType_Tag(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
         public override object ConvertToCSharpType(string v)
         {
-           return new GroupType("tag",v);
+            return new GroupType("tag", v);
         }
 
         public override string ToString()
@@ -304,6 +305,21 @@ namespace Vortex
     {
         public string groupName = groupName;
         public object value = value;
+
+        public override string ToString()
+        {
+            return value.ToString();
+        }
+    }
+
+    public class VType_Function : V_Variable
+    {
+
+        public VType_Function(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+        public override object ConvertToCSharpType(string v)
+        {
+            throw new IlegalOperationError("Functions cannot be initialized this way");
+        }
 
         public override string ToString()
         {
@@ -326,6 +342,7 @@ namespace Vortex
         Indexer = 10,
         Error = 11,
         GroupType = 12,
+        Function = 13,
         None = 100,
     }
 }

@@ -12,7 +12,7 @@ namespace Vortex
         public string[] FunctionBody { get;  set; } = [];
         public int StartLine { get; private set; }
         public MethodInfo? CSharpFunc { get; set; } = null;
-        public DataType returnType { get; set; }
+        public DataType returnType { get; set; } = DataType.None;
 
         public VFunc(string indetifier,VFile file,VFuncArg[] args,int startLine){
             Identifier = indetifier;
@@ -22,6 +22,20 @@ namespace Vortex
         }
         public string GetFullPath(){
             return File.GetFileName() + "." + Identifier+"()";
+        }
+        public override string ToString()
+        {
+            var join = "";
+            var isInternal = CSharpFunc != null;
+            if(!isInternal){
+                join = string.Join(",", Args.Select(x=>x.name+":"+x.enforcedType.ToString()+(x.defaultValue.value ==null ?"" :"="+x.defaultValue.value?.ToString())));
+            }
+            else{
+                join = string.Join(",", CSharpFunc!.GetParameters().Select(x=>x.Name+":"+x.ParameterType.ToString()));
+            }
+            string f = (isInternal? Identifier[0].ToString().ToLower()+Identifier[1..] : Identifier)+"("+join+")";
+            f+=" "+returnType.ToString()+" :\t"+(isInternal? "<internal function>" : string.Join(';',FunctionBody));
+            return f;
         }
     }
 

@@ -4,7 +4,6 @@ namespace Vortex
     {
         public string Name{get;set;} = "";
         public Dictionary<string, V_Variable> Variables {set; get;} //Local variables
-        public Dictionary<string, VFunc> Functions {private set; get;}
         public int Depth {private set; get;} //How deep we are
         public ScopeTypeEnum ScopeType {private set; get;} //Type of the scope
         public bool Ignore {set; get;} //When true, code will not be executed. Scopes won't be ignored
@@ -14,17 +13,33 @@ namespace Vortex
         public bool FuncTopLevel {set;get;} = false;
         public V_Variable? ReturnValue {set;get;} = null;
         public bool InAFunc {get;set;} = false;
-        public bool InTryStatement {get;set;} = false;
         public VContext? TryParrentContext {get;set;} = null;
         public bool IsMain {get;set;} = false;
-        public VContext(Dictionary<string, V_Variable> vars,Dictionary<string, VFunc> funcs, int depth = 0, ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
+        public VFile? File {get;set;}
+        public VContext(Dictionary<string, V_Variable> vars, VFile? file,int depth = 0,ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
             Variables = vars;
-            Functions = funcs;
             Depth = depth;
             ScopeType = scopeType;
             Ignore = ignore;
             this.StartLine = StartLine;
             SubsequentFramesIgnore = false;
+            File = file;
+        }
+
+        public void Destroy(){
+            Name = "Released";
+            Variables.Clear();
+            Depth = 0;
+            FuncBeingRead = null;
+            ReturnValue = null;
+            TryParrentContext = null;
+            File.TopLevelContext = null;
+            File = null;
+        }
+
+        public override string ToString()
+        {
+            return Name;
         }
     }
 
