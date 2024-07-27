@@ -82,13 +82,15 @@ namespace Vortex
                 {
                     constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value));
                 }
-                if(first){
-                    foreach(var item in constants){
-                        SuperGlobals.SuperGlobalVars.Add(item.Key, ()=>item.Value);
+                if (first)
+                {
+                    foreach (var item in constants)
+                    {
+                        SuperGlobals.SuperGlobalVars.Add(item.Key, () => item.Value);
                     }
                 }
 
-                InternalModules.Add(type.Name[8..], new(constants,null,scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
+                InternalModules.Add(type.Name[8..], new(constants, null, scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
                 first = false;
             }
             //add types
@@ -149,18 +151,16 @@ namespace Vortex
                 {
                     ExecuteLine(line);
                 }
-                catch (ExpressionEvalError e)
+                catch (VortexError e)
                 {
-                    if (GetCurrentContext().TryParrentContext != null)
+                    if (GetCurrentContext().InTryScope && e.type == ErrorType.Runtime)
                     {
-                        //TODO: catch logic
+                        GetCurrentContext().ErrorRaised = e;
+                        GetCurrentContext().Ignore = true;
+                        GetCurrentContext().SubsequentFramesIgnore = true;
                     }
                     else
                         VortexError.ThrowError(e);
-                }
-                catch (VortexError e)
-                {
-                    VortexError.ThrowError(e);
                 }
                 catch (Exception)
                 {
@@ -169,13 +169,28 @@ namespace Vortex
                     Console.Error.WriteLine("C# exception: ");
                     throw;
                 }
+                if (GetCurrentFrame().StopSignal)
+                {
+                    if (CallStack.Count == 1 && GetCurrentContext().ErrorRaised != null)
+                        throw GetCurrentContext().ErrorRaised!;
+                    CallStack.Pop();
+                    return null;
+
+                }
+                if (GetCurrentFrame().CatchSignal)
+                {
+                    //TODO: catch
+                }
                 GetCurrentFrame().currentLine++;
+
                 if (GetCurrentContext().ReturnValue != null)
                 {
                     return GetCurrentContext().ReturnValue;
                 }
 
             }
+            if (GetCurrentContext().ErrorRaised != null)
+                VortexError.ThrowError(GetCurrentContext().ErrorRaised!);
             if (GetCurrentContext().Depth != 0 && !itm)
             {
                 if (GetCurrentContext().FuncBeingRead != null)
@@ -235,10 +250,12 @@ namespace Vortex
                     {
                         if (itm)
                         {
-                            try{
+                            try
+                            {
                                 Console.WriteLine("> " + ExpressionEval.Evaluate(statement));
                             }
-                            catch{
+                            catch
+                            {
                                 throw new UnknownStatementError(statement);
                             }
                             return;
@@ -262,6 +279,7 @@ namespace Vortex
                         CloseContext();
                         OpenNewContext(ScopeTypeEnum.elseScope);
                         GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
+                        GetCurrentContext().InTryScope = context.InTryScope;
                         if (context.SubsequentFramesIgnore)
                         {
                             GetCurrentContext().Ignore = true;
@@ -280,6 +298,7 @@ namespace Vortex
                         CloseContext();
                         OpenNewContext(ScopeTypeEnum.ifScope);
                         GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
+                        GetCurrentContext().InTryScope = context.InTryScope;
                         GetCurrentContext().InAFunc = context.InAFunc;
                         if (context.SubsequentFramesIgnore)
                         {
@@ -291,26 +310,81 @@ namespace Vortex
                     }
                     else if (statementToExec.Name == "CatchScopeStartStement")
                     {
-                        var context = GetCurrentContext();
-                        if (context.ScopeType != ScopeTypeEnum.tryScope)
+                        var tryContext = GetCurrentContext();
+                        if (tryContext.ScopeType != ScopeTypeEnum.tryScope&&tryContext.ScopeType != ScopeTypeEnum.catchScope)
                         {
-                            throw new IlegalStatementContextError("catch", context.ScopeType.ToString());
+                            throw new IlegalStatementContextError("catch", tryContext.ScopeType.ToString());
                         }
                         CloseContext();
-                        OpenNewContext(ScopeTypeEnum.catchScope);
-                        if (context.SubsequentFramesIgnore)
+                        if (tryContext.ErrorRaised == null)
                         {
-                            GetCurrentContext().Ignore = true;
+                            OpenNewContext(ScopeTypeEnum.catchScope);
+                            GetCurrentContext().FuncBeingRead = tryContext.FuncBeingRead;
+                            GetCurrentContext().InAFunc = tryContext.InAFunc;
                             GetCurrentContext().SubsequentFramesIgnore = true;
+                            GetCurrentContext().Ignore = true;
                         }
                         else
-                            GetCurrentContext().Ignore = !context.Ignore;
+                        {
+                            Type[] errorType=[];
+                            bool any = false;
+                            if(statement=="catch :")
+                               any = true;
+                            else
+                            try
+                            {
+                                var cases = string.Join(' ',Utils.StringSplit(statement, ' ')[1..]);
+                                cases = cases.Replace(" :", string.Empty);
+                               
+                                var casesArray = Utils.ArgsEval(cases, ',', oneType: DataType.GroupType);
+                                
+                                errorType =  casesArray!.Select(x=>(Type)((GroupType)x.value).value).ToArray();
+                            }
+                            catch (VortexError e)
+                            {
+                                VortexError.ThrowError(e);
+                                return;
+                            }
+                            if (tryContext.ErrorRaised.type != ErrorType.Runtime)
+                            {
+                                throw new IlegalOperationError("Only runtime errors can be caught");
+                            }
+                            if (any||errorType.Contains(tryContext.ErrorRaised.GetType()))
+                            {
+                                OpenNewContext(ScopeTypeEnum.catchScope);
+                                GetCurrentContext().FuncBeingRead = tryContext.FuncBeingRead;
+                                GetCurrentContext().InAFunc = tryContext.InAFunc;
+                            }
+                            else
+                            {
+                                GetCurrentContext().ErrorRaised = tryContext.ErrorRaised;
+                                OpenNewContext(ScopeTypeEnum.catchScope);
+                                GetCurrentContext().FuncBeingRead = tryContext.FuncBeingRead;
+                                GetCurrentContext().InAFunc = tryContext.InAFunc;
+                                GetCurrentContext().SubsequentFramesIgnore = true;
+                                GetCurrentContext().Ignore = true;
+                                GetCurrentContext().ErrorRaised = tryContext.ErrorRaised;
+                            }
+
+
+                        }
                     }
                 }
                 else
                 if (endsScope)
                 {
+                    var context = GetCurrentContext();
                     CloseContext();
+                    if(context.ErrorRaised!=null){
+                        GetCurrentContext().ErrorRaised = context.ErrorRaised;
+                        GetCurrentContext().Ignore=true;
+                        GetCurrentContext().SubsequentFramesIgnore=true;
+                    }
+                    if(context.ScopeType == ScopeTypeEnum.catchScope&&!context.Ignore){
+                        GetCurrentContext().Ignore = true;
+                        GetCurrentContext().SubsequentFramesIgnore = true;
+                        GetCurrentContext().ErrorRaised = null;
+                    }
                 }
                 else
                 if (startsScope)
@@ -322,6 +396,7 @@ namespace Vortex
                     //inhirit function
                     GetCurrentContext().FuncBeingRead = prevContext.FuncBeingRead;
                     GetCurrentContext().InAFunc = prevContext.InAFunc;
+                    GetCurrentContext().InTryScope = prevContext.InTryScope;
                     if (prevContext.Ignore)
                     {
                         GetCurrentContext().SubsequentFramesIgnore = true;
@@ -346,7 +421,7 @@ namespace Vortex
         public VContext OpenNewContext(ScopeTypeEnum type)
         {
 
-            var newC = new VContext([],null,GetCurrentFrame().ScopeStack.Count, type, StartLine: GetCurrentFrame().currentLine);
+            var newC = new VContext([], null, GetCurrentFrame().ScopeStack.Count, type, StartLine: GetCurrentFrame().currentLine);
             GetCurrentFrame().ScopeStack.Push(newC);
             return newC;
         }
@@ -376,7 +451,7 @@ namespace Vortex
         {
             if (!GetCurrentFrame().ScopeStack.TryPeek(out _))
             {
-                return new([],null);
+                return new([], null);
             }
             return GetCurrentFrame().ScopeStack.First();
         }
@@ -417,7 +492,8 @@ namespace Vortex
                     {
                         return true;
                     }
-                    else{
+                    else
+                    {
                         throw new UnknownNameError(identifier);
                     }
                 }
@@ -534,7 +610,7 @@ namespace Vortex
                         throw new UnknownNameError(module);
                     }
                 }
-                if (!ReadVar(identifier, out var func_, context,type:DataType.Function))
+                if (!ReadVar(identifier, out var func_, context, type: DataType.Function))
                 {
                     throw new UnknownNameError(identifier);
                 }
@@ -554,9 +630,10 @@ namespace Vortex
                     i++;
                 }
                 val = CallFunction(func, argsList);
-                if(itm){
-                    var val_ = val==null||val.value==null?"none":val.value;
-                    Console.WriteLine("< "+val_.ToString());
+                if (itm)
+                {
+                    var val_ = val == null || val.value == null ? "none" : val.value;
+                    Console.WriteLine("< " + val_.ToString());
 
                 }
                 return true;
@@ -755,10 +832,9 @@ namespace Vortex
         [MarkStatement("try :", true, scopeType: ScopeTypeEnum.tryScope)]
         public void TryScopeStartStement(string statement)
         {
-            
-
+            GetCurrentContext().InTryScope = true;
         }
-        [MarkStatement("catch :", true, scopeType: ScopeTypeEnum.catchScope, true)]
+        [MarkStatement("catch ", true, scopeType: ScopeTypeEnum.catchScope, true)]
         public void CatchScopeStartStement(string statement)
         {
 
@@ -808,12 +884,12 @@ namespace Vortex
             }
             var file = statement[8..] + ".vort";
             VFile file_ = new(file);
-            
+
             if (!file_.Exists())
             {
                 throw new FileDoesNotExistError(file);
             }
-            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper()+file_.GetFileName()[1..]))
+            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper() + file_.GetFileName()[1..]))
             {
                 throw new ModuleAlreadyLoadedError(file_.GetFileName());
             }
@@ -830,11 +906,11 @@ namespace Vortex
             }
             var file = statement[12..] + ".vort";
             VFile file_ = new(file);
-            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper()+file_.GetFileName()[1..]))
+            if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper() + file_.GetFileName()[1..]))
             {
                 return;
             }
-            
+
             if (!file_.Exists())
             {
                 throw new FileDoesNotExistError(file);
@@ -848,15 +924,16 @@ namespace Vortex
         {
             var file = statement[8..];
             VContext? value = null;
-            try{
-                value = (VContext)ExpressionEval.Evaluate(file,DataType.Module).value;
+            try
+            {
+                value = (VContext)ExpressionEval.Evaluate(file, DataType.Module).value;
             }
-            catch{}
-            if (value==null&&!ActiveModules.TryGetValue(file, out value))
+            catch { }
+            if (value == null && !ActiveModules.TryGetValue(file, out value))
             {
                 throw new UnknownNameError(file);
             }
-            if (GetCurrentFrame().VFile.TopLevelContext==value)
+            if (GetCurrentFrame().VFile.TopLevelContext == value)
             {
                 throw new IlegalStatementContextError("Release", GetCurrentContext().ScopeType.ToString()).SetInfo("Cannot release the currently executed module");
             }
@@ -962,7 +1039,7 @@ namespace Vortex
         //         throw new ReadingUnsetValue(identifier);
         //     return res;
         // }
-        public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, bool ignoreTopLevel = false,DataType type = DataType.Any)
+        public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, bool ignoreTopLevel = false, DataType type = DataType.Any)
         {
             Dictionary<string, V_Variable> vars;
             if (context == null)
@@ -973,11 +1050,12 @@ namespace Vortex
             {
                 vars = context.Variables;
             }
-            if(context==null){
-                if(TryGetSuperGlobal(identifier, out val, type))
+            if (context == null)
+            {
+                if (TryGetSuperGlobal(identifier, out val, type))
                     return true;
             }
-            
+
             var res = vars.TryGetValue(identifier, out val);
             if (!res)
             {
@@ -997,19 +1075,20 @@ namespace Vortex
 
             if (!val.flags.unsetable && val.type == DataType.Unset)
                 throw new ReadingUnsetValueError(identifier);
-                if(type!=DataType.Any&&val.type != type)
-                    throw new UnmatchingDataTypeError(identifier, type.ToString());
+            if (type != DataType.Any && val.type != type)
+                throw new UnmatchingDataTypeError(identifier, type.ToString());
             return res;
         }
-        public static bool TryGetSuperGlobal(string identifier, out V_Variable? val, DataType type = DataType.Any){
+        public static bool TryGetSuperGlobal(string identifier, out V_Variable? val, DataType type = DataType.Any)
+        {
             if (SuperGlobals.SuperGlobalVars.TryGetValue(identifier, out var l))
             {
                 val = l();
-                if(type!=DataType.Any&&val.type != type)
+                if (type != DataType.Any && val.type != type)
                     throw new UnmatchingDataTypeError(val.type.ToString(), type.ToString());
                 return true;
             }
-            val=null;
+            val = null;
             return false;
         }
         public static bool TryGetModule(string name, out VContext module)
@@ -1139,7 +1218,7 @@ namespace Vortex
         }
         public static bool DefineFunc(string identifier, VFunc var)
         {
-            return DeclareVar(identifier,V_Variable.Construct(DataType.Function,var));
+            return DeclareVar(identifier, V_Variable.Construct(DataType.Function, var));
         }
         public static VFrame NewFrame(VFile file, ScopeTypeEnum scopeType, int lineOffset, string name)
         {
@@ -1148,7 +1227,7 @@ namespace Vortex
                 throw new StackOverflowError();
             }
             VFrame frame = new(file, lineOffset, name);
-            frame.ScopeStack.Push(new([],file, 0, scopeType, StartLine: GetCurrentFrame().currentLine));
+            frame.ScopeStack.Push(new([], file, 0, scopeType, StartLine: GetCurrentFrame().currentLine){InTryScope = GetCurrentContext().InTryScope});
             CallStack.Push(frame);
             return frame;
         }

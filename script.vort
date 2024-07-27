@@ -1,8 +1,6 @@
-array(a) :
-> a
-> _frame
-raise error("FUCK YOU")
-;
+try :
+    /
+catch :
+> "hello"
 
-> this
-$x = 1
+;

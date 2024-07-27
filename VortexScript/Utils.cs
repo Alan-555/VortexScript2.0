@@ -254,12 +254,18 @@ namespace Vortex
             return result.ToArray();
         }
 
-        public static VArray? ArgsEval(string input, char delimiter,DataType[]? dataTypes=null)
+        public static VArray? ArgsEval(string input, char delimiter,DataType[]? dataTypes=null, DataType? oneType = null)
         {
             var argsArray = StringSplit(input, delimiter);
             if (argsArray.Length == 1 && argsArray[0] == "")
             {
                 argsArray = [];
+            }
+            if(oneType != null){
+                dataTypes = new DataType[argsArray.Length];
+                for(int i_=0;i_<dataTypes.Length;i_++){
+                    dataTypes[i_]=(DataType)oneType;
+                }
             }
             var ret = new VArray();
             bool notEnfored = dataTypes==null;

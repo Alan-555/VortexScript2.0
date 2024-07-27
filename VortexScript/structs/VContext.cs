@@ -9,11 +9,12 @@ namespace Vortex
         public bool Ignore {set; get;} //When true, code will not be executed. Scopes won't be ignored
         public int StartLine {private set; get;} //The line that this scope was started at
         public bool SubsequentFramesIgnore {set; get;} //When true, all subsequent frames in the stack will inhirit ignore flag and this flag, no matter the actual condition
+        public bool InTryScope {set;get;} = false;
+        public VortexError? ErrorRaised {set;get;} = null;
         public VFunc? FuncBeingRead {set;get;} = null;
         public bool FuncTopLevel {set;get;} = false;
         public V_Variable? ReturnValue {set;get;} = null;
         public bool InAFunc {get;set;} = false;
-        public VContext? TryParrentContext {get;set;} = null;
         public bool IsMain {get;set;} = false;
         public VFile? File {get;set;}
         public VContext(Dictionary<string, V_Variable> vars, VFile? file,int depth = 0,ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0 ){
@@ -32,7 +33,6 @@ namespace Vortex
             Depth = 0;
             FuncBeingRead = null;
             ReturnValue = null;
-            TryParrentContext = null;
             File.TopLevelContext = null;
             File = null;
         }

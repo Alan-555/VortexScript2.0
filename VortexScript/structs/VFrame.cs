@@ -7,7 +7,8 @@ namespace Vortex
         public int currentLine;
         public Stack<VContext> ScopeStack {get; private set;} = new();
         public string Name {get; private set;}
-        public int StartLine {get; private set;}
+        public bool StopSignal {get; set;} = false;
+        public bool CatchSignal {get; set;} = false;
 
         public VFrame(VFile vFile,int lineStart, string name){
             currentLine = lineStart;
