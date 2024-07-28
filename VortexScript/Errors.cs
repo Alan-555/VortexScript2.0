@@ -46,17 +46,22 @@ namespace Vortex
             this.info = info;
             return this;
         }
+        public override string ToString()
+        {
+            return GetType().ToString().Replace("Vortex.","") + message+"\t"+info;
+        }
 
         public static void ThrowError(VortexError error)
         {
-            Console.WriteLine("A " + error.GetType().ToString() + " has occured!");
+            Console.WriteLine("Error: ");
+            Console.Write(error.GetType().ToString().Replace("Vortex.","") + " has been raised: ");
             Console.WriteLine(error.message + "\n\t" + error.info);
             if (ErrorHints.TryGetValue(error.info, out var val))
             {
                 Console.WriteLine("\t" + val);
             }
             Console.WriteLine("In: " + Interpreter.GetCurrentFrame().VFile.Path + ":" + (Interpreter.GetCurrentFrame().currentLine + 1));
-            Console.WriteLine("Stack trace follows:");
+            Console.WriteLine("\nListing frames:");
             int lastLine = 0;
             List<string> toP = [];
             foreach (var frame in Interpreter.CallStack.Reverse())
@@ -81,7 +86,7 @@ namespace Vortex
     public class UnknownStatementError(params string[] args) : VortexError("Unknown statement '{0}'", ErrorType.Syntax, args);
     public class ExpressionEvalError : VortexError
     {
-        public ExpressionEvalError(Evaluator eval, params string[] args) : base("Could not evaluate expression '" + eval.originalExpression + "'", ErrorType.Runtime, args){}
+        public ExpressionEvalError(Evaluator eval, params string[] args) : base("Could not evaluate expression '" + eval.originalExpression + "'", ErrorType.Runtime, args){SetInfo(args[0]);}
     }
 
     public class IdentifierAlreadyUsedError(params string[] args) : VortexError("The identifier '{0}' has already been used in the current context", ErrorType.Runtime, args);

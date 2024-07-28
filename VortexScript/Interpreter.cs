@@ -58,7 +58,6 @@ namespace Vortex
                from type in domainAssembly.GetTypes()
                where typeof(InternalModule).IsAssignableFrom(type)
                select type).ToArray();
-            //TODO: do not load in advance? Load dynamically?
             bool first = true;
             foreach (var type in listOfBs)
             {
@@ -176,10 +175,6 @@ namespace Vortex
                     CallStack.Pop();
                     return null;
 
-                }
-                if (GetCurrentFrame().CatchSignal)
-                {
-                    //TODO: catch
                 }
                 GetCurrentFrame().currentLine++;
 
@@ -731,11 +726,16 @@ namespace Vortex
             if (unlink)
             {
                 string identifer_ = statement[2..];
-                if (!GetCurrentContext().Variables.Remove(identifer_))
+                bool removed = false;
+                foreach (var context in GetCurrentFrame().ScopeStack)
+                {
+                    removed = context.Variables.Remove(identifer_);
+                    if(removed) return;
+                }
+                if (!removed)
                 {
                     throw new UnknownNameError(identifer_);
                 }
-                return;
             }
             bool init = Utils.StringContains(statement, "=");
             string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];

@@ -461,6 +461,8 @@ namespace Vorteval
 
         public object TokenToPrimitive(Token token)
         {
+            if(token.actualValue!=null)
+                return token.actualValue;
             return V_Variable.Construct(TokenToDataType[token.type],token.value).ConvertToCSharpType(token.value);
         }
 
@@ -631,7 +633,7 @@ namespace Vorteval
                             }
                             arrayInit = arrayInit[..end];
                             tokens.Add(new Token(TokenType.Array, arrayInit));
-                            i = end + 1;
+                            i+=1 + arrayInit.Length;
                             if (i >= expression.Length)
                             {
                                 break;
