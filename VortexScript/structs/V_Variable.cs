@@ -34,7 +34,7 @@ namespace Vortex
 
         //flags
         public V_VarFlags flags;
-        public static V_Variable Construct(DataType type, object value, V_VarFlags flags = default)
+        public static V_Variable Construct(DataType type, object? value, V_VarFlags flags = default)
         {
             var type_ = DataTypeToType[type];
             return (V_Variable)Activator.CreateInstance(type_, type, value, flags)!;
@@ -50,11 +50,11 @@ namespace Vortex
         {
             return Construct(type, value, flags).value;
         }
-        protected V_Variable(DataType type, object value, V_VarFlags flags)
+        protected V_Variable(DataType type, object? value, V_VarFlags flags)
         {
 
             this.type = type;
-            this.value = value;
+            this.value = value!;
 
             this.flags = flags;
             if (type == DataType.Unset)
@@ -88,7 +88,7 @@ namespace Vortex
         }
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
 
@@ -105,7 +105,7 @@ namespace Vortex
         }
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
 
@@ -118,7 +118,7 @@ namespace Vortex
         }
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
         public override V_Variable Index(int index)
         {
@@ -218,7 +218,7 @@ namespace Vortex
 
     public class VType_Module : V_Variable
     {
-        VContext moduleRef;
+        VContext? moduleRef;
         public VType_Module(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
         public override object ConvertToCSharpType(string v)
         {
@@ -271,7 +271,7 @@ namespace Vortex
 
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
 
@@ -298,7 +298,7 @@ namespace Vortex
 
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
     public struct GroupType(string groupName, object value)
@@ -308,7 +308,7 @@ namespace Vortex
 
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
 
@@ -323,7 +323,7 @@ namespace Vortex
 
         public override string ToString()
         {
-            return value.ToString();
+            return value.ToString()!;
         }
     }
 

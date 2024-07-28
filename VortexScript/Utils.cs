@@ -140,7 +140,6 @@ namespace Vortex
         {
             bool insideQuotes = false;
             int inputLength = input.Length;
-            int matchIndex = -1;
             int nested = 0; 
 
             for (int i = 0; i < inputLength; i++)
@@ -173,7 +172,6 @@ namespace Vortex
         {
             bool insideQuotes = false;
             int inputLength = input.Length;
-            int matchIndex = -1;
             int nested = 0; 
 
             for (int i = 0; i < inputLength; i++)
@@ -210,7 +208,6 @@ namespace Vortex
             bool insideQuotes = false;
             int nestedScope = 0;
             int nestedScopeSquare = 0;
-            int i = 0;
             foreach (char c in input)
             {
                 if (c == '\"')
@@ -315,7 +312,7 @@ namespace Vortex
         
         public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method)
         {
-            return method.GetParameters().Select(x => new VFuncArg(x.Name)).ToArray();
+            return method.GetParameters().Select(x => new VFuncArg(x.Name!)).ToArray();
         }
 
 

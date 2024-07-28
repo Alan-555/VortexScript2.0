@@ -33,7 +33,8 @@ namespace Vortex
             Depth = 0;
             FuncBeingRead = null;
             ReturnValue = null;
-            File.TopLevelContext = null;
+            if(File!=null)
+                File.TopLevelContext = null;
             File = null;
         }
 

@@ -8,11 +8,6 @@ namespace Vortex{
             var data = Utils.ArgsEval(init,',') ?? throw new FuncOverloadNotFoundError("array",Utils.StringSplit(init,',').Length.ToString());
             return V_Variable.Construct(DataType.Array,data);
         }
-        [InternalFunc(DataType.None)]
-        public static V_Variable Print(string data){
-            Console.WriteLine(data);
-            return null;
-        }
         [InternalFunc(DataType.Type)]
         public static V_Variable TypeOf(V_Variable var){
             return V_Variable.Construct(DataType.Type,var.type.ToString());
@@ -50,7 +45,11 @@ namespace Vortex{
                 throw new IlegalOperationError("ExpressionEvalError may only be used during an expression evaluation (missing eval instance)");
             }
             try{
-                throw (VortexError)Activator.CreateInstance(err,"!"+message);
+                VortexError? err_ = (VortexError)Activator.CreateInstance(err,"!"+message)!;
+                if(err_!=null)
+                    throw err_;
+                else
+                    throw new Exception("Error is null");
             }
             catch(MissingMethodException){
                 throw new IlegalOperationError("This error may not be raised using the raise statement");

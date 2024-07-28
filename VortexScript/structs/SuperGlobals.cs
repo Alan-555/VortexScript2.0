@@ -52,17 +52,17 @@ namespace Vortex
         }
     }
     public  class InternalRandom : InternalModule{
-        public static Random random;
+        public static Random? random;
 
         [InternalFunc(DataType.Number)]
         public static double Random(double a, double b){
             PreRandom((int)a,(int)b);
-            return random.Next((int)b-(int)a)+(int)a;
+            return random!.Next((int)b-(int)a)+(int)a;
         }
         [InternalFunc(DataType.Number)]
         public static double RandomRange(double a, double b){
             PreRandom(a,b);
-            return random.NextDouble()*(b-a)+a;
+            return random!.NextDouble()*(b-a)+a;
         }
         public static void PreRandom(double a, double b){
             if(a>=b||a<0){

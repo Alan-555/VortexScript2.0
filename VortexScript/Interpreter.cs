@@ -64,7 +64,7 @@ namespace Vortex
                 var method = type
                 .GetMethods()
                 .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
-                .Select(mi => new VFunc(mi.Name, null, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
+                .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
                 .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
                 Dictionary<string, V_Variable> constants = [];
                 type.GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -609,7 +609,7 @@ namespace Vortex
                 {
                     throw new UnknownNameError(identifier);
                 }
-                if (func_.value is not VFunc func)
+                if (func_!.value is not VFunc func)
                     throw new InvalidCastException("Function is not a VFunc");
                 string args = statement[(argsStart + 1)..argsEnd];
                 var argsArray = Utils.ArgsEval(args, ',', func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, Utils.StringSplit(args, ',').Length.ToString());
@@ -647,7 +647,7 @@ namespace Vortex
                 {
                     if (arg.ParameterType == typeof(string))
                     {
-                        args_[i] = args_[i].ToString();
+                        args_[i] = args_[i].ToString()!;
                     }
                     else if (arg.ParameterType == typeof(V_Variable))
                     {
@@ -1150,12 +1150,12 @@ namespace Vortex
                 {
                     if (old.flags.readonly_)
                         throw new AssigmentToReadonlyVarError(identifier);
-                    (old.value as VArray).RemoveAll(x => x.value.Equals(value.value));
+                    (old.value as VArray)!.RemoveAll(x => x.value.Equals(value.value));
                 }
             }
             return false;
         }
-        public static bool SetSpecial(string identifier, V_Variable v, SpecialAssigment sa)
+        public static bool SetSpecial(string identifier, V_Variable v, SpecialAssigment sa)//TODO: refactor
         {
             V_Variable old = null;
             foreach (var Context in GetCurrentFrame().ScopeStack)

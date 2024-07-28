@@ -53,7 +53,7 @@ namespace Vortex
                     if (dataTypeField != null)
                     {
                         // Set the out parameter
-                        dataType = (DataType)dataTypeField.GetValue(directiveInstance);
+                        dataType = (DataType)dataTypeField.GetValue(directiveInstance)!;
                     }
 
                     // Return the FieldInfo
