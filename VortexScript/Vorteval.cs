@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using VortexScript.Definitions;
+using VortexScript.Structs;
 using VortexScript.Vortex;
 namespace VortexScript;
 
@@ -8,6 +9,10 @@ public class Evaluator
 {
     public static bool InitDone = false;
     public static int HighestPrecedence = -1;
+
+    public static string[] Operators = [];
+
+    public string originalExpression = "";
 
     public static V_Variable Evaluate(string expression, DataType requiredType = DataType.None)
     {
@@ -66,42 +71,17 @@ public class Evaluator
         {DataType.GroupType,typeof(string)},
 
     };
-    public static readonly Dictionary<DataType, TokenType> DataTypeToToken = new(){
-        {DataType.String,TokenType.String},
-        {DataType.Number,TokenType.Number},
-        {DataType.Bool,TokenType.Bool},
-        {DataType.Unset,TokenType.Unset},
-         {DataType.None,TokenType.None},
-         {DataType.Any,TokenType.Any},
-         {DataType.NaN,TokenType.NaN},
-         {DataType.Array,TokenType.Array},
-         {DataType.Module,TokenType.Module},
-         {DataType.Type,TokenType.Type},
-         {DataType.Indexer,TokenType.Indexer},
-         {DataType.Error,TokenType.Error},
-         {DataType.GroupType,TokenType.Tag},
-         {DataType.Int,TokenType.Int},
-         {DataType.Function,TokenType.Function},
 
-    };
-    public static readonly Dictionary<TokenType, DataType> TokenToDataType = new(){
-        {TokenType.String,DataType.String},
-        {TokenType.Number,DataType.Number},
-        {TokenType.Bool,DataType.Bool},
-        {TokenType.Unset,DataType.Unset},
-        {TokenType.Any,DataType.Any},
-        {TokenType.NaN,DataType.NaN},
-        {TokenType.Array,DataType.Array},
-        {TokenType.None,DataType.None},
-        {TokenType.Module,DataType.Module},
-        {TokenType.Type,DataType.Type},
-        {TokenType.Indexer,DataType.Indexer},
-        {TokenType.Error,DataType.Error},
-        {TokenType.Tag,DataType.GroupType},
-        {TokenType.Int,DataType.Int},
-        {TokenType.Function,DataType.Function},
+    public static DataType TokenTypeToDataType(TokenType type)
+    {
+        return (DataType)Enum.Parse(typeof(DataType), type.ToString());
+    }
 
-    };
+    public static TokenType DataTypeToTokenType(DataType type)
+    {
+        return (TokenType)Enum.Parse(typeof(TokenType), type.ToString());
+    }
+
 
     public static readonly OperatorsDictiononary OperatorFunctions = new()
     {
@@ -163,9 +143,6 @@ public class Evaluator
 
 
     };
-    public static string[] Operators = [];
-
-    public string originalExpression;
 
     public V_Variable Evaluate(string expression)
     {
@@ -193,7 +170,7 @@ public class Evaluator
                     throw new ExpressionEvalError(new() { originalExpression = "" }, "Empty expression");
                 var result = RecursiveEval(expression);
                 tokens.RemoveRange(start, end - start + 1);
-                tokens.Insert(start, new(DataTypeToToken[result.type], result.ToString(), result.value));
+                tokens.Insert(start, new(DataTypeToTokenType(result.type), result.ToString(), result.value));
                 dist = end - start;
             }
         }
@@ -224,7 +201,7 @@ public class Evaluator
                     throw new IndexOutOfBoundsError(index.ToString());
                 }
                 tokens[i] = new(TokenType.Ignore, "");
-                tokens[i + 1] = new(DataTypeToToken[variable.type], variable.ToString(), variable.value);
+                tokens[i + 1] = new(DataTypeToTokenType(variable.type), variable.ToString(), variable.value);
             }
         }
         tokens.RemoveAll(x => x.type == TokenType.Ignore);
@@ -247,7 +224,7 @@ public class Evaluator
         {
             throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens, true) + ") apeared after proccessing. Are you missing an operator or an operand?");
         }
-        var dataType = TokenToDataType[tokens[0].type];
+        var dataType = TokenTypeToDataType(tokens[0].type);
         if (tokens[0].actualValue != null)
             return V_Variable.Construct(dataType, tokens[0].actualValue!);
         var value = tokens[0].value;
@@ -272,7 +249,7 @@ public class Evaluator
                 {
                     throw new UnknownNameError(tokens[i].value);
                 }
-                tokens[i] = new(DataTypeToToken[variable.type], variable.ToString(), variable.value);
+                tokens[i] = new(DataTypeToTokenType(variable.type), variable.ToString(), variable.value);
             }
             else if (tokens[i].type == TokenType.Console_in)
             {
@@ -300,7 +277,7 @@ public class Evaluator
                 }
                 else
                 {
-                    tokens[i] = new(DataTypeToToken[res.type], res.ToString(), res.value);
+                    tokens[i] = new(DataTypeToTokenType(res.type), res.ToString(), res.value);
                 }
                 module = null;
             }
@@ -459,14 +436,14 @@ public class Evaluator
                     var val2 = TokenToPrimitive(tokens[rightI]);
                     var result = oper.Func(0, val2);
                     tokens.RemoveRange(leftI + 1, 2);
-                    tokens.Insert(leftI + 1, new(DataTypeToToken[oper.ResultType], result.ToString(), result));
+                    tokens.Insert(leftI + 1, new(DataTypeToTokenType(oper.ResultType), result.ToString(), result));
                 }
                 else
                 {
                     var val1 = TokenToPrimitive(tokens[leftI]);
                     var result = oper.Func(val1, 0);
                     tokens.RemoveRange(leftI, 2);
-                    tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString(), result));
+                    tokens.Insert(leftI, new(DataTypeToTokenType(oper.ResultType), result.ToString(), result));
                 }
             }
             else
@@ -475,7 +452,7 @@ public class Evaluator
                 var val2 = TokenToPrimitive(tokens[rightI]);
                 var result = oper.Func(val1, val2);
                 tokens.RemoveRange(leftI, rightI - leftI + 1);
-                tokens.Insert(leftI, new(DataTypeToToken[oper.ResultType], result.ToString()));
+                tokens.Insert(leftI, new(DataTypeToTokenType(oper.ResultType), result.ToString()));
             }
         }
 
@@ -488,7 +465,7 @@ public class Evaluator
     {
         if (token.actualValue != null)
             return token.actualValue;
-        return V_Variable.Construct(TokenToDataType[token.type], token.value).ConvertToCSharpType(token.value);
+        return V_Variable.Construct(TokenTypeToDataType(token.type), token.value).ConvertToCSharpType(token.value);
     }
 
     public string TokensToExpression(List<Token> tokens, bool seperate = false)
@@ -705,7 +682,7 @@ public class Evaluator
     public List<ExpressionScope> Scopify(List<Token> tokens)
     {
         List<ExpressionScope> scopes = new();
-        int depth = 0, start = -1, end = -1;
+        int depth = 0, start = -1, end;
         int i = 0;
         foreach (var token in tokens)
         {
@@ -739,69 +716,7 @@ public class Evaluator
 
 }
 
-public struct Token
-{
-    public TokenType type;
-    public string value = "";
 
-    public object? actualValue;
-
-    public Token(TokenType type, string value, object? actualValue = null)
-    {
-        this.type = type;
-        this.value = value;
-        this.actualValue = actualValue;
-        if (type == TokenType.String)
-            this.actualValue = value;
-    }
-
-    public readonly object GetVal()
-    {
-        if (actualValue == null)
-            return V_Variable.Construct(Evaluator.TokenToDataType[type], value).value;
-        return actualValue;
-    }
-    public readonly V_Variable GetValVar()
-    {
-        if (actualValue != null)
-            return V_Variable.Construct(Evaluator.TokenToDataType[type], actualValue);
-        return V_Variable.Construct(Evaluator.TokenToDataType[type], value);
-    }
-}
-public struct Operator
-{
-    public string Oper { get; }
-    public Type LeftType { get; }
-    public Type RightType { get; }
-    public Func<dynamic, dynamic, dynamic> Func { get; }
-    public int Priority { get; }
-    public DataType ResultType { get; }
-    public bool Unary { get; }
-    public bool IsBeofre { get; }
-
-    public Operator(string oper, DataType leftType, DataType rightType, Func<dynamic, dynamic, dynamic> func, int priority, DataType resultType = DataType.String, bool unary = false)
-    {
-        Oper = oper;
-        LeftType = Evaluator.CSharpDataRepresentations[leftType];
-        RightType = Evaluator.CSharpDataRepresentations[rightType];
-        Func = func;
-        Priority = priority;
-        ResultType = resultType;
-        Unary = unary;
-        IsBeofre = leftType == DataType.None;
-    }
-
-}
-public struct ExpressionScope(int from, int to)
-{
-    public int From { get; } = from;
-    public int To { get; } = to;
-}
-public struct OperatorTask(int priority, Operator oper)
-{
-    public int Priority { get; } = priority;
-    public Operator Oper { get; } = oper;
-}
 public enum TokenType
 {
     Number = 0, //1,5
@@ -821,7 +736,7 @@ public enum TokenType
     None = 14,
     Type = 15,
     Error = 16,
-    Tag = 17,
+    GroupType = 17,
     Int = 18,
     Ignore = 100,
 

@@ -16,8 +16,6 @@ public class Interpreter
     public static bool itm = false;
 
 
-    //directives
-    public static bool DIR_BufferInput = false;
 
     //Internal stuff
     public static MethodInfo[] statements = [];
