@@ -1,4 +1,5 @@
 using System.Reflection;
+using VortexScript.Structs;
 
 namespace VortexScript.Vortex;
 

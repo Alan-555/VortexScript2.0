@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Text;
 using VortexScript.Definitions;
 using VortexScript.Structs;
@@ -9,8 +10,7 @@ public class Evaluator
 {
     public static bool InitDone = false;
     public static int HighestPrecedence = -1;
-
-    public static string[] Operators = [];
+    public static string[] UnaryOperators = [];
 
     public string originalExpression = "";
 
@@ -30,20 +30,28 @@ public class Evaluator
         }
         return result;
     }
+    public static string[] operators = [];
 
     public static void Init()
     {
         if (InitDone) return;
         InitDone = true;
-
-        foreach (var oper in OperatorFunctions)
+        Operators.Init();
+        foreach (var oper in Operators.Operators_)
         {
-            if (!Operators.Contains(oper.Value.Oper))
+            bool lNone = oper.Key.left == TokenType.None;
+            bool rNone = oper.Key.right == TokenType.None;
+            if (lNone || rNone)
             {
-                Operators = [.. Operators, oper.Value.Oper];
+                char before = lNone ? 'r' : 'l';
+                UnaryOperators = [.. UnaryOperators, before + oper.Key.syntax];
             }
-            if (oper.Value.Priority > HighestPrecedence)
-                HighestPrecedence = oper.Value.Priority;
+            if (!operators.Contains(oper.Key.syntax))
+            {
+                operators = [.. operators, oper.Key.syntax];
+            }
+            if (oper.Key.precedence > HighestPrecedence)
+                HighestPrecedence = oper.Key.precedence;
         }
     }
 
@@ -82,67 +90,6 @@ public class Evaluator
         return (TokenType)Enum.Parse(typeof(TokenType), type.ToString());
     }
 
-
-    public static readonly OperatorsDictiononary OperatorFunctions = new()
-    {
-        //unary
-        {"a§_", new("§",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
-        {"_!b", new("!",DataType.None,DataType.Bool,(a,b)=> !b,0,DataType.Bool,true)},
-        {"_-n", new("-",DataType.None,DataType.Number,(a,b)=> -b,0,DataType.Number,true)},
-        {"s~_", new("~",DataType.String,DataType.None,(a,b)=> {if(int.TryParse(a,out int res)) return res; else throw new InvalidFormatError(a,"a number");},0,DataType.Number,true)},
-        {"b~_", new("~",DataType.Bool,DataType.None,(a,b)=> a ? 1:0,0,DataType.Number,true)},
-        {"n~_", new("~",DataType.Number,DataType.None,(a,b)=>a,0,DataType.Number,true)},
-        {"a??_", new("??",DataType.Any,DataType.None,(a,b)=> -b,0,DataType.Bool,true)},
-        {"n@_", new("@",DataType.Number,DataType.None,(a,b)=> Math.Floor(a),0,DataType.Int,true)},
-        //multiplicative
-        { "n*n", new("*",DataType.Number, DataType.Number, (a, b) => a * b, 1,DataType.Number) },
-        { "n/n", new("/",DataType.Number, DataType.Number, (a, b) => a / b, 1,DataType.Number) },
-        { "n%n", new("%",DataType.Number, DataType.Number, (a, b) => a % b, 1,DataType.Number) },
-        { "n°n", new("°",DataType.Number, DataType.Number, (a, b) => Math.Pow(a, b), 1,DataType.Number) },
-
-        //addative
-        { "n+n", new("+",DataType.Number, DataType.Number, (a, b) => a + b, 2,DataType.Number) },
-        { "n-n", new("-",DataType.Number, DataType.Number, (a, b) => a - b, 2,DataType.Number) },
-        { "n+s", new("+",DataType.Number, DataType.String, (a, b) => a.ToString() + b, 2) },
-        { "s+n", new("+",DataType.Number, DataType.String, (a, b) => a + b.ToString(), 2) },
-        { "s+s", new("+",DataType.String, DataType.String, (a, b) => a + b, 2) },
-
-        //bitshift
-        { "n<<n", new("<<",DataType.Number, DataType.Number, (a, b) => (int)a << (int)b, 3,DataType.Number) },
-        { "n>>n", new(">>",DataType.Number, DataType.Number, (a, b) => (int)a >> (int)b, 3,DataType.Number) },
-
-
-        //relative
-        {"n>n", new(">",DataType.Number, DataType.Number, (a,b) => a > b, 4,DataType.Bool) },
-        {"n<n", new("<",DataType.Number, DataType.Number, (a,b) => a < b, 4,DataType.Bool) },
-        {"n>=n", new(">=",DataType.Number, DataType.Number, (a,b) => a >= b, 4,DataType.Bool) },
-        {"n<=n", new("<=",DataType.Number, DataType.Number, (a,b) => a <= b, 4,DataType.Bool) },
-
-
-        //compparative
-        {"n==n", new("==",DataType.Number, DataType.Number, (a,b) => a == b, 5,DataType.Bool) },
-        {"s==s", new("==",DataType.String, DataType.Number, (a,b) => a == b, 5,DataType.Bool) },
-        {"n==s", new("==",DataType.Number, DataType.String, (a,b) => a.ToString() == b, 5,DataType.Bool) },
-        {"s==n", new("==",DataType.String, DataType.Number, (a,b) => a == b.ToString(), 5,DataType.Bool) },
-        {"b==b", new("==",DataType.Bool, DataType.Number, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
-        {"a==a", new("==",DataType.Any, DataType.Any, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
-        {"i==n", new("==",DataType.Indexer, DataType.Number, (a,b) => false, 5,DataType.Bool) },
-        {"t==t", new("==",DataType.Type, DataType.Type, (a,b) => a.ToString() == b.ToString(), 5,DataType.Bool) },
-        
-
-        //bitwise
-        { "n&n", new("&",DataType.Number, DataType.Number, (a, b) => a & b, 6,DataType.Number) },
-        { "n|n", new("|",DataType.Number, DataType.Number, (a, b) => a | b, 6,DataType.Number) },
-        { "n^n", new("^",DataType.Number, DataType.Number, (a, b) => a ^ b, 6,DataType.Number) },
-        
-
-        //logical
-        {"b&&b", new("&&",DataType.Bool, DataType.Bool, (a,b) => a && b, 7,DataType.Bool) },
-        {"b||b", new("||",DataType.Bool, DataType.Bool, (a,b) => a || b, 7,DataType.Bool) },
-        //ternary TODO:
-
-
-    };
 
     public V_Variable Evaluate(string expression)
     {
@@ -327,74 +274,41 @@ public class Evaluator
         int index = 0;
         bool modified = false;
         bool found = false;
-        Operator oper = new();
+        int unaryT = 0;
         int leftI = 0, rightI = 0;
+        object? value = null;
+
+        DataType resultType = DataType.None;
         foreach (var token in tokens)
         {
             if (token.type == TokenType.Operator)
             {
-                found = true;
+                Token? left = null, right = null;
                 leftI = index - 1;
                 rightI = index + 1;
-                char left = '_', right = '_';
-                try
+                if (index == 0)
                 {
-                    left = tokens[leftI].type.ToString().ToLower()[0];
-                    if (left == 'o')
-                        left = '_';
+                    left = null;
                 }
-                catch { }
-                try
+                else
                 {
-                    right = tokens[rightI].type.ToString().ToLower()[0];
-                    if (right == 'o')
-                        right = '_';
+                    left = tokens[leftI];
                 }
-                catch { }
-                bool good = false;
-                good = OperatorFunctions.TryGet(left + token.value + right, out oper);
-
-                if (!good)
+                if (index == tokens.Count - 1)
                 {
-                    OperatorFunctions.TryGetAny(token.value, out oper);
-                    if (oper.Priority != priority)
-                    {
-                        index++;
-                        continue;
-                    }
-                    if (left != '_' && right != '_')
-                        throw new ExpressionEvalError(this, "Unknown operator: " + tokens[leftI].type.ToString() + token.value + tokens[rightI].type.ToString());
-                    else if (left != '_')
-                        throw new ExpressionEvalError(this, "Unknown operator: " + tokens[leftI].type.ToString() + token.value);
-                    else if (right != '_')
-                        throw new ExpressionEvalError(this, "Unknown operator: " + token.value + tokens[rightI].type.ToString());
-                    else
-                        throw new ExpressionEvalError(this, "No operands found for operator: " + token.value);
-
-
+                    right = null;
                 }
-                if (oper.Priority != priority)
+                else
+                {
+                    right = tokens[rightI];
+                }
+                value = Operators.RunOperation(left, right, token.value, priority, this, out resultType, out unaryT);
+                if (value == null)
                 {
                     index++;
                     continue;
                 }
-                if (oper.Unary)
-                {
-                    if (oper.IsBeofre)
-                    {
-                        if (right == '_')
-                        {
-                            throw new ExpressionEvalError(this, "Expected an operand after unary operator '" + oper.Oper + "'");
-                        }
-                    }
-                    else
-                    {
-                        if (left == '_')
-                        {
-                            throw new ExpressionEvalError(this, "Expected an operand before unary operator '" + oper.Oper + "'");
-                        }
-                    }
-                }
+                found = true;
                 modified = true;
                 break;
 
@@ -409,51 +323,24 @@ public class Evaluator
         }
         if (modified)
         {
-            if (oper.Unary)
+            if (unaryT == 1)
             {
-                if (oper.Oper == "??")
-                {
-                    var val1 = tokens[leftI];
-                    var result = val1.type != TokenType.Unset;
-                    tokens.RemoveRange(leftI, 2);
-                    tokens.Insert(leftI, new(TokenType.Bool, result.ToString(), result));
-                }
-                else
-                if (oper.Oper == "§")
-                {
-                    var val1 = tokens[leftI];
-                    var result = val1.type != TokenType.Unset;
-                    tokens.RemoveRange(leftI, 2);
-                    if (result)
-                        tokens.Insert(leftI, val1);
-                    else
-                        tokens.Insert(leftI, new(TokenType.String, ""));
-
-                }
-                else
-                if (oper.IsBeofre)
-                {
-                    var val2 = TokenToPrimitive(tokens[rightI]);
-                    var result = oper.Func(0, val2);
-                    tokens.RemoveRange(leftI + 1, 2);
-                    tokens.Insert(leftI + 1, new(DataTypeToTokenType(oper.ResultType), result.ToString(), result));
-                }
-                else
-                {
-                    var val1 = TokenToPrimitive(tokens[leftI]);
-                    var result = oper.Func(val1, 0);
-                    tokens.RemoveRange(leftI, 2);
-                    tokens.Insert(leftI, new(DataTypeToTokenType(oper.ResultType), result.ToString(), result));
-                }
+                //right irelevant
+                tokens.RemoveAt(leftI);
+            }
+            else if (unaryT == 2)
+            {
+                //left irelevant
+                tokens.RemoveAt(rightI);
+                leftI++;
             }
             else
             {
-                var val1 = TokenToPrimitive(tokens[leftI]);
-                var val2 = TokenToPrimitive(tokens[rightI]);
-                var result = oper.Func(val1, val2);
-                tokens.RemoveRange(leftI, rightI - leftI + 1);
-                tokens.Insert(leftI, new(DataTypeToTokenType(oper.ResultType), result.ToString()));
+                tokens.RemoveRange(leftI, 2);
             }
+
+            var val = V_Variable.Construct(resultType, value);
+            tokens[leftI] = new(DataTypeToTokenType(resultType), val.ToString(), val.value);
         }
 
 
@@ -520,7 +407,7 @@ public class Evaluator
                 continue;
             }
 
-            else if (!(!readingVar && char.IsDigit(c)) && identifierValidChars.Contains(c))
+            else if (!(!readingVar && char.IsDigit(c)) && identifierValidChars.Contains(c)&&operatorTest=="")
             {
                 readingVar = true;
                 currentToken.Append(c);
@@ -569,19 +456,19 @@ public class Evaluator
                 if (!inString)
                 {
                     operatorTest += c;
-                    foreach (var oper in OperatorFunctions)
+                    foreach (var oper in Operators.Operators_)
                     {
-                        if (oper.Value.Oper.StartsWith(operatorTest))
+                        if (oper.Key.syntax.StartsWith(operatorTest))
                         {
                             isOperator = true;
                             break;
                         }
                     }
-                    if (Operators.Contains(operatorTest))
+                    if (Operators.Operators_.Any(x => x.Key.syntax == operatorTest))
                     {
                         if (i < expression.Length - 1)
                         {
-                            if (Operators.Any(x => x.StartsWith(operatorTest + expression[i + 1])))
+                            if (Operators.Operators_.Any(x => x.Key.syntax.StartsWith(operatorTest + expression[i + 1])))
                             {
                                 continue;
                             }
@@ -716,6 +603,337 @@ public class Evaluator
 
 }
 
+public class OperatorDict : Dictionary<OperatorDefinition, MethodInfo>
+{
+    public new bool TryGetValue(OperatorDefinition def, out MethodInfo? out_, out bool precedenceCorrect)
+    {
+        try
+        {
+            bool r = false;
+            out_ = this.First(x =>
+            {
+                var k = x.Key;
+                r = k.precedence == def.precedence;
+                bool leftGood, rightGood;
+                leftGood = k.left == TokenType.Any || k.left == def.left;
+                rightGood = k.right == TokenType.Any || k.right == def.right;
+                return leftGood && rightGood && def.syntax == k.syntax;
+            }).Value;
+            precedenceCorrect = r;
+            return true;
+        }
+        catch
+        {
+            out_ = null;
+            precedenceCorrect = false;
+            return false;
+        }
+
+    }
+    public OperatorDict(Dictionary<OperatorDefinition, MethodInfo>? dict)
+    {
+        if (dict == null) return;
+        foreach (var item in dict)
+        {
+            this[item.Key] = item.Value;
+        }
+    }
+}
+
+public class Operators
+{
+    public static OperatorDict Operators_ = new(null);
+    public static void Init()
+    {
+        Operators_ = new(typeof(Operators)
+           .GetMethods()
+           .Where(m => m.GetCustomAttributes(typeof(OperatorDefinition), false).Length > 0)
+           .ToDictionary(m => m.GetCustomAttribute<OperatorDefinition>(), m => m));
+    }
+    public static object? RunOperation(Token? left, Token? right, string syntax, int currentPrecedence, Evaluator eval, out DataType returnType, out int unaryN)
+    {
+
+        string? element = Evaluator.UnaryOperators.FirstOrDefault(x => x[1..] == syntax);
+        bool unary = false;
+        unaryN = 0;
+        if (element != null)
+        {
+            //unary
+            if (element[0] == 'l')
+            {
+                unaryN = 1;
+                if (!right.HasValue || right.Value.type == TokenType.Operator)
+                {
+                    right = null;
+                    unary = true;
+                }
+            }
+            else if (!left.HasValue || left.Value.type == TokenType.Operator)
+            {
+                unaryN = 2;
+                left = null;
+                unary = true;
+            }
+        }
+        else
+        {
+            unaryN = 0;
+            //binary - search for a binary operator
+
+        }
+        //find the operator for current precedence
+        TokenType left_ = left.HasValue ? left.Value.type : TokenType.None;
+        TokenType right_ = right.HasValue ? right.Value.type : TokenType.None;
+        OperatorDefinition def = new(left_, right_, syntax, currentPrecedence);
+        bool precedenceCorrect = false;
+        //check if the operator exists
+        if (!Operators_.TryGetValue(def, out var oper, out precedenceCorrect))
+        {
+            (left_, right_) = (right_, left_);
+            //check if the operator with the other order exists
+            if (unary || !Operators_.TryGetValue(def, out oper, out precedenceCorrect))
+            {
+                var oldTypeLeft = left_;
+                var oldTypeRight = right_;
+                if (unary)
+                {
+                    (left_, right_) = (right_, left_);
+                    if (left_ == TokenType.None)
+                        right_ = TokenType.Any;
+                    else
+                        left_ = TokenType.Any;
+                }
+                else
+                {
+                    left_ = TokenType.Any;
+                    right_ = TokenType.Any;
+                }
+                def = new(left_, right_, syntax, currentPrecedence);
+                if (!Operators_.TryGetValue(def, out oper, out precedenceCorrect))
+                    throw new ExpressionEvalError(eval, "Unknown operator: " + (oldTypeRight == TokenType.None ? "" : oldTypeRight.ToString()) + syntax + (oldTypeLeft == TokenType.None ? "" : oldTypeLeft.ToString()));
+            }
+            else
+            {
+                //adjust the operands back
+                (right_, left_) = (left_, right_);
+
+            }
+        }
+        if (!precedenceCorrect)
+        {
+            returnType = DataType.None;
+            return null;
+        }
+        if (unary && oper.GetParameters().Length != 1)
+        {
+            throw new ExpressionEvalError(eval, "An unary operator takes only one operand: " + syntax);
+        }
+        object? result = null;
+        if (unary)
+        {
+            try
+            {
+
+                if (right == null)
+                {
+                    result = oper.Invoke(null, parameters: [left]);
+                }
+                else
+                {
+                    result = oper.Invoke(null, parameters: [right]);
+                }
+            }
+            catch (TargetInvocationException e)
+            {
+                throw e.InnerException!;
+            }
+        }
+        else
+        {
+            //binary
+            try
+            {
+                result = oper.Invoke(null, parameters: [left, right]);
+            }
+            catch (TargetInvocationException e)
+            {
+                throw e.InnerException!;
+            }
+        }
+        if (result == null)
+        {
+            throw new ExpressionEvalError(eval, "An operator must return a value: " + syntax);
+        }
+        returnType = oper.GetCustomAttribute<OperatorDefinition>()!.returnType;
+        return result;
+    }
+    //unary
+    [OperatorDefinition(TokenType.None, TokenType.Number, "-", 0, DataType.Number)]
+    public static double Negate(Token right)
+    {
+        return -(double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Bool, TokenType.None, "!", 0, DataType.Bool)]
+    public static bool BoolNegate(Token left)
+    {
+        return !(bool)left.GetVal();
+    }
+    [OperatorDefinition(TokenType.String, TokenType.None, "§", 0, DataType.String)]
+    public static string StringUnset(Token left)
+    {
+        var value = left.GetVal().ToString()!;
+        if (value == "unset")
+        {
+            return "";
+        }
+        return value;
+    }
+    [OperatorDefinition(TokenType.String, TokenType.None, "~", 0, DataType.Number)]
+    public static double CastToInt(Token left)
+    {
+        var value = left.GetVal().ToString()!;
+        if (double.TryParse(value, CultureInfo.InvariantCulture, out var result))
+        {
+            return result;
+        }
+        throw new InvalidFormatError(left.value, "a number");
+    }
+    [OperatorDefinition(TokenType.Bool, TokenType.None, "~", 0, DataType.Number)]
+    public static double CastBoolToInt(Token left)
+    {
+        var value = (bool)left.GetVal();
+        return value ? 1 : 0;
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.None, "~", 0, DataType.Number)]
+    public static double CastNumberToInt(Token left)
+    {
+        return (double)left.GetVal();
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.None, "??", 0, DataType.Bool)]
+    public static bool IsNotUnset(Token left)
+    {
+        return left.type != TokenType.Unset;
+    }
+
+    //mult
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "*", 1, DataType.Number)]
+    public static double MulNumbers(Token left, Token right)
+    {
+        return (double)left.GetVal() * (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "/", 1, DataType.Number)]
+    public static double DivNumbers(Token left, Token right)
+    {
+        return (double)left.GetVal() / (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "%", 1, DataType.Number)]
+    public static double ModNumbers(Token left, Token right)
+    {
+        return (double)left.GetVal() % (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "°", 1, DataType.Number)]
+    public static double ExpNumbers(Token left, Token right)
+    {
+        return Math.Pow((double)left.GetVal(), (double)right.GetVal());
+    }
+    //addative
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "+", 2, DataType.Number)]
+    public static double AddNumbers(Token left, Token right)
+    {
+        return (double)left.GetVal() + (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Int, TokenType.Int, "+", 2, DataType.Int)]
+    public static double AddNumbersInt(Token left, Token right)
+    {
+        return (double)left.GetVal() + (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Any, "+", 2, DataType.String)]
+    public static string Add(Token left, Token right)
+    {
+        return left.GetVal().ToString() + right.GetVal().ToString();
+    }
+
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "-", 2, DataType.Number)]
+    public static double Sub(Token left, Token right)
+    {
+        return (double)left.GetVal() - (double)right.GetVal();
+    }
+
+
+    //Bitshift
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "<<", 3, DataType.Number)]
+    public static double ShiftLeft(Token left, Token right)
+    {
+        return (int)Math.Floor((double)left.GetVal()) << (int)Math.Floor((double)right.GetVal());
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, ">>", 3, DataType.Number)]
+    public static double ShiftRight(Token left, Token right)
+    {
+        return (int)Math.Floor((double)left.GetVal()) >> (int)Math.Floor((double)right.GetVal());
+    }
+
+    //relative
+    [OperatorDefinition(TokenType.Number, TokenType.Number, ">", 4, DataType.Bool)]
+    public static bool Greater(Token left, Token right)
+    {
+        return (double)left.GetVal() > (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "<", 4, DataType.Bool)]
+    public static bool Lesser(Token left, Token right)
+    {
+        return (double)left.GetVal() < (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, ">=", 4, DataType.Bool)]
+    public static bool GreaterOrEqual(Token left, Token right)
+    {
+        return (double)left.GetVal() >= (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "<=", 4, DataType.Bool)]
+    public static bool LesserOrEqual(Token left, Token right)
+    {
+        return (double)left.GetVal() <= (double)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Type, " is ", 5, DataType.Bool)]
+    public static bool IsOperator(Token left, Token right)
+    {
+        return left.GetValVar().type == (DataType)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Array, " is ", 5, DataType.Bool)]
+    public static bool IsOperatorArray(Token left, Token right)
+    {
+        var values = (VArray)right.GetValVar().value;
+        var vals_ = values.Select(x=>(DataType)x.value);
+        return vals_.Any(x=>x==left.GetValVar().type);
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Any, "==", 5, DataType.Bool)]
+    public static bool Equals(Token left, Token right)
+    {
+        var lType = left.type;
+        var rType = right.type;
+        if ((int)lType < (int)rType)
+        {
+            (left, right) = (right, left);
+            (lType, rType) = (rType, lType);
+        }
+        dynamic val1 = left.GetVal(), val2 = right.GetVal();
+        if (lType == TokenType.Unset)
+            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
+        if (rType == TokenType.Unset)
+            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
+        return val1 == val2;
+    }
+    [OperatorDefinition(TokenType.Bool, TokenType.Bool, "||", 8, DataType.Bool)]
+    public static bool Or(Token left, Token right)
+    {
+        return (bool)left.GetVal() || (bool)right.GetVal();
+    }
+    [OperatorDefinition(TokenType.Bool, TokenType.Bool, "&&", 7, DataType.Bool)]
+    public static bool And(Token left, Token right)
+    {
+        return (bool)left.GetVal() && (bool)right.GetVal();
+    }
+
+}
 
 public enum TokenType
 {

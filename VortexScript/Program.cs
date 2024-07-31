@@ -10,6 +10,7 @@ public class Program
         if (args.Length == 0)
         {
             file = InteractiveTermMode;
+            file = "script.vort";
         }
         else
         {

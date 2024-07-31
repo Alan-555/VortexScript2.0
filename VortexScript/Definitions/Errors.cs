@@ -86,7 +86,7 @@ public class ExpectedTokenError(params string[] args) : VortexError("'{0}' expec
 public class UnknownStatementError(params string[] args) : VortexError("Unknown statement '{0}'", ErrorType.Syntax, args);
 public class ExpressionEvalError : VortexError
 {
-    public ExpressionEvalError(Evaluator eval, params string[] args) : base("Could not evaluate expression '" + eval.originalExpression + "'", ErrorType.Runtime, args) { SetInfo(args[0]); }
+    public ExpressionEvalError(Evaluator eval, params string[] args) : base("Could not evaluate expression '" + eval?.originalExpression + "'", ErrorType.Runtime, args) { SetInfo(args[0]); }
 }
 
 public class IdentifierAlreadyUsedError(params string[] args) : VortexError("The identifier '{0}' has already been used in the current context", ErrorType.Runtime, args);

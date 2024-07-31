@@ -29,3 +29,22 @@ public class InternalFunc : Attribute
     }
 
 }
+
+[AttributeUsage(AttributeTargets.Method)]
+public class OperatorDefinition : Attribute
+{
+    public TokenType left { get; set; }
+    public TokenType right { get; set; }
+    public string syntax {get; set;}
+    public int precedence { get; set; }
+    public DataType returnType { get; set; }
+
+    public OperatorDefinition(TokenType left, TokenType right, string syntax, int precedence,DataType dt=DataType.None)
+    {
+        this.left = left;
+        this.right = right;
+        this.syntax = syntax;
+        this.precedence = precedence;
+        this.returnType = dt;
+    }
+}

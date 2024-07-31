@@ -78,7 +78,11 @@ public abstract class V_Variable
 
 public class VType_Number : V_Variable
 {
-    public VType_Number(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+    public VType_Number(DataType type, object value, V_VarFlags flags) : base(type, value, flags) {
+        if(value!=null&&double.IsInfinity((double)value)){
+            this.value =  double.NaN;
+        }
+     }
     public override object ConvertToCSharpType(string v)
     {
         if (v == "∞" || v == "NaN")
@@ -89,7 +93,7 @@ public class VType_Number : V_Variable
     }
     public override string ToString()
     {
-        return value.ToString()!;
+        return ((double)value).ToString(CultureInfo.InvariantCulture)!;
     }
 }
 
