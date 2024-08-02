@@ -910,17 +910,24 @@ public class Operators
     {
         var lType = left.type;
         var rType = right.type;
-        if ((int)lType < (int)rType)
-        {
-            (left, right) = (right, left);
-            (lType, rType) = (rType, lType);
-        }
         dynamic val1 = left.GetVal(), val2 = right.GetVal();
         if (lType == TokenType.Unset)
             throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
         if (rType == TokenType.Unset)
             throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
         return val1.ToString() == val2.ToString();
+    }
+     [OperatorDefinition(TokenType.Any, TokenType.Any, "===", 5, DataType.Bool)]
+    public static bool EqualsStrict(Token left, Token right)
+    {
+        var lType = left.type;
+        var rType = right.type;
+        dynamic val1 = left.GetValVar(), val2 = right.GetValVar();
+        if (lType == TokenType.Unset)
+            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
+        if (rType == TokenType.Unset)
+            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
+        return val1.value.ToString() == val2.value.ToString() && val1.type == val2.type;
     }
     [OperatorDefinition(TokenType.Bool, TokenType.Bool, "||", 8, DataType.Bool)]
     public static bool Or(Token left, Token right)
@@ -959,85 +966,4 @@ public enum TokenType
     Ignore = 100,
 
     Unknown = -1 //  some garbage
-}
-
-public class OperatorsDictiononary : Dictionary<string, Operator>
-{
-    public bool TryGet(string key, out Operator result)
-    {
-        KeyValuePair<string, Operator> result_ = default;
-        if (key.Contains("??"))
-        {
-            result_ = new("a??_", new("??", DataType.Any, DataType.None, (a, b) => a, 0, DataType.Number, true));
-        }
-        else
-        if (key.Contains("§"))
-        {
-            result_ = new("a§_", new("§", DataType.Any, DataType.None, (a, b) => a, 0, DataType.Number, true));
-        }
-        else
-        if (key.Contains('_'))
-        {
-            if (key[0] == '_')
-            {
-                try
-                {
-                    result_ = this.First(x => x.Key.EndsWith(key[1..]));
-                    if (!result_.Key.Contains('_'))
-                        throw new Exception("Invalid wildcard");
-                }
-                catch
-                {
-                    result_ = default;
-                }
-            }
-            else
-            {
-                try
-                {
-                    result_ = this.First(x => x.Key.StartsWith(key[..^1]));
-                    if (!result_.Key.Contains('_'))
-                        throw new Exception("Invalid wildcard");
-                }
-                catch
-                {
-                    result_ = default;
-                }
-            }
-        }
-
-        else
-        {
-            return TryGetValue(key, out result);
-        }
-        if (result_.Equals(default(KeyValuePair<string, Operator>)))
-        {
-            result = default;
-            return false;
-        }
-        result = result_.Value;
-        return true;
-    }
-
-    public bool TryGetAny(string key, out Operator result)
-    {
-        KeyValuePair<string, Operator> result_ = default;
-
-        try
-        {
-            result_ = this.First(x => x.Key.Contains(key));
-        }
-        catch
-        {
-            result_ = default;
-        }
-
-        if (result_.Equals(default(KeyValuePair<string, Operator>)))
-        {
-            result = default;
-            return false;
-        }
-        result = result_.Value;
-        return true;
-    }
 }
