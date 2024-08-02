@@ -145,8 +145,15 @@ public class Interpreter
 
     V_Variable? ExecuteLines(string[] lines)
     {
-        foreach (string line in lines)
+        while(GetCurrentFrame().currentLine < lines.Length)
         {
+
+            string line;
+            if (itm)
+                line = lines[0];
+            else
+                line = lines[GetCurrentFrame().currentLine];
+
             try
             {
                 ExecuteLine(line);
@@ -184,15 +191,15 @@ public class Interpreter
                 return GetCurrentContext().ReturnValue;
             }
 
+            if (GetCurrentContext().ErrorRaised != null)
+                VortexError.ThrowError(GetCurrentContext().ErrorRaised!);
         }
-        if (GetCurrentContext().ErrorRaised != null)
-            VortexError.ThrowError(GetCurrentContext().ErrorRaised!);
         if (GetCurrentContext().Depth != 0 && !itm)
-        {
-            if (GetCurrentContext().FuncBeingRead != null)
-                VortexError.ThrowError(new FunctionBodyLeakError((GetCurrentContext().StartLine + 1).ToString()));
-            else
-                VortexError.ThrowError(new ScopeLeakError((GetCurrentContext().StartLine + 1).ToString()));
+            {
+                if (GetCurrentContext().FuncBeingRead != null)
+                    VortexError.ThrowError(new FunctionBodyLeakError((GetCurrentContext().StartLine + 1).ToString()));
+                else
+                    VortexError.ThrowError(new ScopeLeakError((GetCurrentContext().StartLine + 1).ToString()));
         }
         return null;
     }
@@ -382,6 +389,11 @@ public class Interpreter
                     GetCurrentContext().Ignore = true;
                     GetCurrentContext().SubsequentFramesIgnore = true;
                     GetCurrentContext().ErrorRaised = null;
+                }
+                if(context.ScopeType == ScopeTypeEnum.loopScope&&!context.Ignore){
+                    if((bool)Evaluator.Evaluate(context.LoopCondition, DataType.Bool).value){
+                        GetCurrentFrame().currentLine = context.StartLine-1;
+                    }
                 }
             }
             else
@@ -1025,6 +1037,34 @@ public class Interpreter
         else
         {
             throw new UnexpectedTokenError(args[2]);
+        }
+    }
+
+    [MarkStatement("while ", true, ScopeTypeEnum.loopScope)]
+    public void WhileStatement(string statement)
+    {
+        var condition = Utils.StringSplit(statement, ' ')[1];
+        GetCurrentContext().LoopCondition = condition;
+        if((bool)Evaluator.Evaluate(condition,DataType.Bool).value==false){
+            GetCurrentContext().SubsequentFramesIgnore = true;
+            GetCurrentContext().Ignore = true;
+        }
+        
+    }
+    [MarkStatement("break", false)]
+    public void BreakStatement(string statement)
+    {
+        bool found = false;
+        foreach (var context in GetCurrentFrame().ScopeStack)
+        {
+            context.Ignore = true;
+            context.SubsequentFramesIgnore = true;
+            if(context.ScopeType==ScopeTypeEnum.loopScope){
+                found = true;
+            }
+        }
+        if(!found){
+            throw new IlegalOperationError("Could not find a loop to break from");
         }
     }
 

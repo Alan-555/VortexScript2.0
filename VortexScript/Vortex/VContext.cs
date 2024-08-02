@@ -19,6 +19,7 @@ public class VContext
     public bool InAFunc { get; set; } = false;
     public bool IsMain { get; set; } = false;
     public VFile? File { get; set; }
+    public string LoopCondition { get; set; } = "";
     public VContext(Dictionary<string, V_Variable> vars, VFile? file, int depth = 0, ScopeTypeEnum scopeType = ScopeTypeEnum.genericScope, bool ignore = false, int StartLine = 0)
     {
         Variables = vars;
@@ -57,5 +58,6 @@ public enum ScopeTypeEnum
     genericScope = 4, //scope defined by the user
     tryScope = 5, //try scope of a try-catch statement
     catchScope = 6, //catch scope of a try-catch statement
+    loopScope = 7,
     internal_ = -1,
 }

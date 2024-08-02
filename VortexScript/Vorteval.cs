@@ -368,7 +368,7 @@ public class Evaluator
         return expression;
     }
 
-    public List<Token> Tokenize(string expression)//TODO: fix array(1)==[]
+    public List<Token> Tokenize(string expression)
     {
         var tokens = new List<Token>();
         var currentToken = new StringBuilder();
@@ -920,7 +920,7 @@ public class Operators
             throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
         if (rType == TokenType.Unset)
             throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
-        return val1 == val2;
+        return val1.ToString() == val2.ToString();
     }
     [OperatorDefinition(TokenType.Bool, TokenType.Bool, "||", 8, DataType.Bool)]
     public static bool Or(Token left, Token right)
