@@ -202,10 +202,10 @@ public class Evaluator
             {
                 if (module != null)
                 {
-                    throw new ExpressionEvalError(this, $"The module '{moduleName}' doe not contain a definition for ':'");
+                    throw new ExpressionEvalError(this, $"stdin token is standalone");
                 }
                 if (Interpreter.itm)
-                    Console.Write(": ");
+                    Console.Write("_ ");
                 var in_ = Console.ReadLine();
                 if (in_ == "")
                     tokens[i] = new(TokenType.Unset, "");
@@ -375,6 +375,7 @@ public class Evaluator
         bool inString = false;
         var operatorTest = "";
         bool readingVar = false;
+        bool forceVar = false;
 
         for (int i = 0; i < expression.Length; i++)
         {
@@ -382,6 +383,7 @@ public class Evaluator
 
             if (inString)
             {
+
                 if (c == '"')
                 {
                     inString = false;
@@ -394,21 +396,29 @@ public class Evaluator
                 }
                 continue;
             }
-            else if (c == ':')
+            else if (c == '_'&&!readingVar)
             {
                 tokens.Add(new(TokenType.Console_in, ""));
             }
             else if (readingVar && c == '.')
             {
+                tokens.Add(new(TokenType.Module, currentToken.ToString()){isDot=true});
 
-                tokens.Add(new(TokenType.Module, currentToken.ToString()));
                 currentToken.Clear();
                 readingVar = false;
                 continue;
             }
 
-            else if (!(!readingVar && char.IsDigit(c)) && identifierValidChars.Contains(c)&&operatorTest=="")
+            else if ((readingVar || !char.IsDigit(c)) //if reading a variable or if it's not a number
+                    &&identifierValidChars.Contains(c) //if the current character is a valid identifier character
+                    &&operatorTest=="" //if not reading an operator
+                    &&(readingVar //if reading a variable
+                    ||forceVar //or it is forced
+                    ||tokens.Count==0 //or if it is the first token
+                    ||CanVarFollow(tokens[^1]) //or if the previous token can follow a variable
+                    ))
             {
+                forceVar = false;
                 readingVar = true;
                 currentToken.Append(c);
             }
@@ -417,6 +427,10 @@ public class Evaluator
             if (char.IsDigit(c) || c == '.' && currentToken.Length > 0 && char.IsDigit(currentToken[currentToken.Length - 1]))
             {
                 currentToken.Append(c);
+            }
+            else if(c=='∞'){
+                tokens.Add(new(TokenType.Number,"∞",double.PositiveInfinity));
+                continue;
             }
             else
             {
@@ -442,7 +456,10 @@ public class Evaluator
                     else
                     if (readingVar)
                     {
-                        tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
+                        if(Operators.Operators_.Any(x=>x.Key.syntax==currentToken.ToString()))
+                            tokens.Add(new Token(TokenType.Operator, currentToken.ToString()));
+                        else
+                            tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
                         readingVar = false;
                     }
                     else
@@ -451,6 +468,11 @@ public class Evaluator
 
                     }
                     currentToken.Clear();
+                }
+                if (c == '"')
+                {
+                    inString = true;
+                    continue;
                 }
                 bool isOperator = false;
                 if (!inString)
@@ -530,14 +552,9 @@ public class Evaluator
                         continue;
                     }
                 }
-
-                else if (c == '"')
-                {
-                    inString = true;
-                }
                 else if (c == ' ')
                 {
-
+                    forceVar = true;
                 }
                 else
                 {
@@ -549,6 +566,8 @@ public class Evaluator
         {
             throw new ExpressionEvalError(this, "Unknown operator " + operatorTest);
         }
+        if(inString)
+            throw new ExpectedTokenError("\"");
         if (currentToken.Length > 0)
         {
             if (readingVar)
@@ -600,6 +619,11 @@ public class Evaluator
         return scopes;
     }
 
+    public static bool CanVarFollow(Token prevToken){
+        return  prevToken.type == TokenType.Operator
+        ||(prevToken.type==TokenType.Scope&&prevToken.value=="(")
+        ||(prevToken.type==TokenType.Module&&prevToken.isDot);
+    }
 
 }
 
@@ -772,23 +796,24 @@ public class Operators
     public static double Negate(Token right)
     {
         return -(double)right.GetVal();
-    }
-    [OperatorDefinition(TokenType.Bool, TokenType.None, "!", 0, DataType.Bool)]
+    }   
+    [OperatorDefinition(TokenType.None, TokenType.Bool, "!", 0, DataType.Bool)]
     public static bool BoolNegate(Token left)
     {
         return !(bool)left.GetVal();
     }
-    [OperatorDefinition(TokenType.String, TokenType.None, "§", 0, DataType.String)]
+    [OperatorDefinition(TokenType.String, TokenType.None, "s", 0, DataType.String)]
     public static string StringUnset(Token left)
     {
         var value = left.GetVal().ToString()!;
-        if (value == "unset")
-        {
-            return "";
-        }
         return value;
     }
-    [OperatorDefinition(TokenType.String, TokenType.None, "~", 0, DataType.Number)]
+    [OperatorDefinition(TokenType.Unset, TokenType.None, "s", 0, DataType.String)]
+    public static string StringUnset_(Token left)
+    {
+        return "";
+    }
+    [OperatorDefinition(TokenType.String, TokenType.None, "n", 0, DataType.Number)]
     public static double CastToInt(Token left)
     {
         var value = left.GetVal().ToString()!;
@@ -798,13 +823,13 @@ public class Operators
         }
         throw new InvalidFormatError(left.value, "a number");
     }
-    [OperatorDefinition(TokenType.Bool, TokenType.None, "~", 0, DataType.Number)]
+    [OperatorDefinition(TokenType.Bool, TokenType.None, "n", 0, DataType.Number)]
     public static double CastBoolToInt(Token left)
     {
         var value = (bool)left.GetVal();
         return value ? 1 : 0;
     }
-    [OperatorDefinition(TokenType.Number, TokenType.None, "~", 0, DataType.Number)]
+    [OperatorDefinition(TokenType.Number, TokenType.None, "n", 0, DataType.Number)]
     public static double CastNumberToInt(Token left)
     {
         return (double)left.GetVal();
@@ -813,6 +838,11 @@ public class Operators
     public static bool IsNotUnset(Token left)
     {
         return left.type != TokenType.Unset;
+    }
+     [OperatorDefinition(TokenType.None, TokenType.Any, "typeof", 0, DataType.Type)]
+    public static DataType TypeOfOperator(Token right)
+    {
+        return right.GetValVar().type;
     }
 
     //mult
@@ -836,6 +866,11 @@ public class Operators
     {
         return Math.Pow((double)left.GetVal(), (double)right.GetVal());
     }
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "°°", 1, DataType.Number)]
+    public static double Root(Token left, Token right)
+    {
+        return Math.Pow((double)right.GetVal(), 1/(double)left.GetVal());
+    }
     //addative
     [OperatorDefinition(TokenType.Number, TokenType.Number, "+", 2, DataType.Number)]
     public static double AddNumbers(Token left, Token right)
@@ -847,11 +882,26 @@ public class Operators
     {
         return (double)left.GetVal() + (double)right.GetVal();
     }
+    [OperatorDefinition(TokenType.Array, TokenType.Any, "+", 2, DataType.Array)]
+    public static VArray ArrayAdd(Token left, Token right)
+    {
+        var arr = ((VArray)left.GetVal()).ToArray();
+        var val = right.GetValVar();
+        return [..arr,val];
+    }
+    [OperatorDefinition(TokenType.Array, TokenType.Array, "+", 2, DataType.Array)]
+    public static VArray ArrayAddArray(Token left, Token right)
+    {
+        var arr = ((VArray)left.GetVal()).ToArray();
+        var val = ((VArray)right.GetValVar().value).ToArray();
+        return [..arr,..val];
+    }
     [OperatorDefinition(TokenType.Any, TokenType.Any, "+", 2, DataType.String)]
     public static string Add(Token left, Token right)
     {
         return left.GetVal().ToString() + right.GetVal().ToString();
     }
+
 
     [OperatorDefinition(TokenType.Number, TokenType.Number, "-", 2, DataType.Number)]
     public static double Sub(Token left, Token right)
@@ -893,12 +943,13 @@ public class Operators
     {
         return (double)left.GetVal() <= (double)right.GetVal();
     }
-    [OperatorDefinition(TokenType.Any, TokenType.Type, " is ", 5, DataType.Bool)]
+    [OperatorDefinition(TokenType.Any, TokenType.Type, "is", 5, DataType.Bool)]
     public static bool IsOperator(Token left, Token right)
     {
         return left.GetValVar().type == (DataType)right.GetVal();
     }
-    [OperatorDefinition(TokenType.Any, TokenType.Array, " is ", 5, DataType.Bool)]
+    
+    [OperatorDefinition(TokenType.Any, TokenType.Array, "is", 5, DataType.Bool)]
     public static bool IsOperatorArray(Token left, Token right)
     {
         var values = (VArray)right.GetValVar().value;
@@ -967,3 +1018,4 @@ public enum TokenType
 
     Unknown = -1 //  some garbage
 }
+

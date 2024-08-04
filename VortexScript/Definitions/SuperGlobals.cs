@@ -20,6 +20,9 @@ public static class SuperGlobals
         {"any",()=>V_Variable.Construct(DataType.Any,"any")},
         {"first",()=>V_Variable.Construct(DataType.Indexer,"0")},
         {"last",()=>V_Variable.Construct(DataType.Indexer,"-1")},
+        {"inf",()=>V_Variable.Construct(DataType.Number,double.PositiveInfinity)},
+        {"∞",()=>V_Variable.Construct(DataType.Number,double.PositiveInfinity)},
+
     };
 
     //Math

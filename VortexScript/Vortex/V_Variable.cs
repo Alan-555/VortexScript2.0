@@ -30,6 +30,7 @@ public abstract class V_Variable
             { DataType.Int, typeof(VType_Int)},
             { DataType.Function, typeof(VType_Function)},
         };
+        
     public DataType type;
     public object value;
 
@@ -79,20 +80,22 @@ public abstract class V_Variable
 public class VType_Number : V_Variable
 {
     public VType_Number(DataType type, object value, V_VarFlags flags) : base(type, value, flags) {
-        if(value!=null&&double.IsInfinity((double)value)){
-            this.value =  double.NaN;
+        if(value!=null){
+            if((double)value==0)
+                this.value = 0d;
         }
+       
      }
     public override object ConvertToCSharpType(string v)
     {
-        if (v == "∞" || v == "NaN")
-        {
-            return double.NaN;
-        }
         return double.Parse(v, CultureInfo.InvariantCulture);
     }
     public override string ToString()
     {
+        if(double.IsPositiveInfinity((double)value))
+            return "∞";
+        if(double.IsNegativeInfinity((double)value))
+            return "-∞";
         return ((double)value).ToString(CultureInfo.InvariantCulture)!;
     }
 }
@@ -102,7 +105,7 @@ public class VType_Int : V_Variable
     public VType_Int(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
     public override object ConvertToCSharpType(string v)
     {
-        if (v == "∞" || v == "NaN")
+        if (v == "∞"||v == "-∞" || v == "NaN")
         {
             throw new ArgumentError("Int may not be infinite or NaN");
         }
@@ -184,7 +187,7 @@ public class VType_Array : V_Variable
     }
 }
 
-class VArray : List<V_Variable>
+public class VArray : List<V_Variable>
 {
     public override string ToString()
     {
@@ -197,6 +200,7 @@ class VArray : List<V_Variable>
         return ret;
     }
 }
+
 
 
 public class VType_Unset : V_Variable
@@ -356,13 +360,12 @@ public enum DataType
     Unset = 3,
     Any = 4,
     Int = 5,
-    NaN = 6,
-    Array = 7,
-    Module = 8,
-    Type = 9,
-    Indexer = 10,
-    Error = 11,
-    GroupType = 12,
-    Function = 13,
+    Array = 6,
+    Module = 7,
+    Type = 8,
+    Indexer = 9,
+    Error = 10,
+    GroupType = 11,
+    Function = 12,
     None = 100,
 }

@@ -8,6 +8,7 @@ public struct Token
     public string value = "";
 
     public object? actualValue;
+    public bool isDot = false;
 
     public Token(TokenType type, string value, object? actualValue = null)
     {

@@ -16,6 +16,7 @@ public class VFile
         {
             throw new UseOfAReservedNameError(GetFileName());
         }
+        
     }
     public void InterpretThisFile(bool entrypoint = false)
     {

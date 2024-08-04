@@ -1,6 +1,8 @@
 ﻿using VortexScript.Vortex;
 
 namespace VortexScript;
+
+
 public class Program
 {
     public static readonly string InteractiveTermMode = "interactive_terminal_mode";
@@ -10,7 +12,7 @@ public class Program
         if (args.Length == 0)
         {
             file = InteractiveTermMode;
-            file = "script.vort";
+            //file = "script.vort";
         }
         else
         {

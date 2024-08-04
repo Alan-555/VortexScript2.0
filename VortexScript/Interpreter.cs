@@ -29,7 +29,7 @@ public class Interpreter
     };
 
     //Memory
-    public static Dictionary<string, VContext> ActiveModules { get; private set; } = new();
+    public static Dictionary<string, VContext> ActiveModules { get; private set; } = [];
     public static string[] keywords = [];
 
     public static Stack<VFrame> CallStack { get; private set; } = [];
@@ -107,6 +107,7 @@ public class Interpreter
         }
 
     }
+    string[] ITM_Buffer = [];
     public void ExecuteFile()
     {
         if (File.Path == Program.InteractiveTermMode)
@@ -134,7 +135,8 @@ public class Interpreter
                         ExecuteLines([.. list]);
                     }
                 }
-                ExecuteLines([Console.ReadLine()!]);
+                ITM_Buffer = [..ITM_Buffer, Console.ReadLine()!];
+                ExecuteLines(ITM_Buffer);
             }
         }
         else
@@ -149,11 +151,7 @@ public class Interpreter
         {
 
             string line;
-            if (itm)
-                line = lines[0];
-            else
-                line = lines[GetCurrentFrame().currentLine];
-
+            line = lines[GetCurrentFrame().currentLine];
             try
             {
                 ExecuteLine(line);
@@ -1092,6 +1090,10 @@ public class Interpreter
         else
         {
             vars = context.Variables;
+        }
+        if(ActiveModules.TryGetValue(identifier, out var module)||InternalModules.TryGetValue(identifier, out module)){
+            val = V_Variable.Construct(DataType.Module,module,new(){readonly_=true});
+            return true;
         }
         if (context == null)
         {
