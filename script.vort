@@ -1,0 +1,4 @@
+addStringMath(String a, String b) Number :
+    < (a)n+(b)n
+;
+addStringMath(5,_)

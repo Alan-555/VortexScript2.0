@@ -521,7 +521,7 @@ public class Interpreter
             int argsEnd = Utils.StringIndexOf(statement, ")");
             if (argsStart == 0)
             {
-                throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
+                throw new UnexpectedTokenError("(").SetInfo("Identifier expected prior");
             }
             else if (argsStart == -1)
             {
@@ -543,17 +543,29 @@ public class Interpreter
                 argsArray = [];
             }
             List<VFuncArg> argsList = new List<VFuncArg>();
-            foreach (var arg in argsArray)
+            foreach (var arg_ in argsArray)
             {
-                if (!Utils.IsIdentifierValid(arg))
-                {
-                    throw new InvalidIdentifierError(arg);
+                var ident = arg_.Trim();
+                var index = Utils.StringIndexOf(ident," ");
+                DataType? type = null;
+                if(index!=-1){
+                    type = (DataType)Evaluator.Evaluate(ident[..index], DataType.Type).value;
+                    ident = ident[(index+1)..];
                 }
-                if (argsList.Any(x => x.name == arg))
+                if (!Utils.IsIdentifierValid(ident))
                 {
-                    throw new DuplicateVariableError(arg);
+                    throw new InvalidIdentifierError(ident);
                 }
-                argsList.Add(new(arg));
+                if (argsList.Any(x => x.name == ident))
+                {
+                    throw new DuplicateVariableError(ident);
+                }
+                if(type.HasValue){
+                    argsList.Add(new(ident){enforcedType=(DataType)type});                
+                }
+                else{
+                    argsList.Add(new(ident));                
+                }
             }
             VFunc func = new(identifier, File, [.. argsList], GetCurrentFrame().currentLine);
             var c = OpenNewContext(ScopeTypeEnum.functionScope);
@@ -709,7 +721,7 @@ public class Interpreter
             }
             return V_Variable.Construct(func.returnType, val_);
         }
-        NewFrame(func.File, ScopeTypeEnum.functionScope, func.StartLine + 1, func.GetFullPath());
+        NewFrame(func.File, ScopeTypeEnum.functionScope, func.StartLine + 1, func.GetFullPath()).currentLine = 0;
         Interpreter funcInterpreter = new(func.File);
         foreach (var arg in args)
         {
@@ -724,6 +736,7 @@ public class Interpreter
     [MarkStatement("$", false)]
     public void DeclareStatement(string statement)
     {
+        //statement = statement.Replace(":connect","=");
         statement = Utils.StringRemoveSpaces(statement);
         if (statement.Length < 2)
         {
@@ -731,7 +744,7 @@ public class Interpreter
         }
         bool unsetable = statement[1] == '?';
         bool readonly_ = statement[1] == '!';
-        bool unlink = statement[1] == '$'; //TODO: fix. WHen undeclaring in a scope the top level takes precesnde and is remove first
+        bool unlink = statement[1] == '$';
         if (unsetable || readonly_)
         {
             statement = statement.Remove(1, 1);

@@ -12,7 +12,7 @@ public class VFunc
     public string[] FunctionBody { get; set; } = [];
     public int StartLine { get; private set; }
     public MethodInfo? CSharpFunc { get; set; } = null;
-    public DataType returnType { get; set; } = DataType.None;
+    public DataType returnType { get; set; } = DataType.Any;
 
     public VFunc(string indetifier, VFile file, VFuncArg[] args, int startLine)
     {

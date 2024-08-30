@@ -60,7 +60,7 @@ public class VortexError : Exception
         {
             Console.WriteLine("\t" + val);
         }
-        Console.WriteLine("In: " + Interpreter.GetCurrentFrame().VFile.Path + ":" + (Interpreter.GetCurrentFrame().currentLine + 1));
+        Console.WriteLine("In: " + Interpreter.GetCurrentFrame().VFile.Path + ":" + (Interpreter.GetCurrentFrame().currentLine + 1+Interpreter.GetCurrentFrame().LineOffset));
         Console.WriteLine("\nListing frames:");
         int lastLine = 0;
         List<string> toP = [];
