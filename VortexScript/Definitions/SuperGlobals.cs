@@ -103,3 +103,18 @@ public class InternalStd : InternalModule
         Console.WriteLine(a);
     }
 }
+
+public class InternalClio : InternalModule
+{
+    public static readonly V_Variable HorsePower = V_Variable.Construct(DataType.Number, -1d);
+    public static readonly V_Variable Incidents = V_Variable.Construct(DataType.Array, new VArray());
+
+
+    [InternalFunc(DataType.Array)]
+    public static V_Variable Drive(){
+        string[] allInc = ["tree","hole","ditch","granny","police","deep space","death"];
+        string inc = allInc[(int)InternalRandom.Random((int)0,(int)allInc.Length)];
+        (Incidents.value as VArray).Add(V_Variable.Construct(DataType.String,inc));
+        return Incidents;
+    }
+}

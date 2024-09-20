@@ -1,3 +1,4 @@
+using VortexScript.Definitions;
 using VortexScript.Vortex;
 
 namespace VortexScript.Structs;
@@ -29,6 +30,8 @@ public struct Token
     {
         if (actualValue != null)
             return V_Variable.Construct(Evaluator.TokenTypeToDataType(type), actualValue);
+        if(type==TokenType.Operator)
+            throw new IlegalOperationError("Cannot construct a variable of type "+type);
         return V_Variable.Construct(Evaluator.TokenTypeToDataType(type), value);
     }
 }
