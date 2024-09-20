@@ -367,5 +367,5 @@ public enum DataType
     Error = 10,
     GroupType = 11,
     Function = 12,
-    None = 100,
+    None = 13,
 }
