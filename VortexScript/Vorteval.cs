@@ -676,7 +676,7 @@ public class Operators
     }
     public static object? RunOperation(Token? left, Token? right, string syntax, int currentPrecedence, Evaluator eval, out DataType returnType, out int unaryN)
     {
-
+        
         string? element = Evaluator.UnaryOperators.FirstOrDefault(x => x[1..] == syntax);
         bool unary = false;
         unaryN = 0;
@@ -709,9 +709,9 @@ public class Operators
         TokenType left_ = left.HasValue ? left.Value.type : TokenType.None;
         TokenType right_ = right.HasValue ? right.Value.type : TokenType.None;
         OperatorDefinition def = new(left_, right_, syntax, currentPrecedence);
-        bool precedenceCorrect = false;
+
         //check if the operator exists
-        if (!Operators_.TryGetValue(def, out var oper, out precedenceCorrect))
+        if (!Operators_.TryGetValue(def, out var oper, out bool precedenceCorrect))
         {
             (left_, right_) = (right_, left_);
             //check if the operator with the other order exists
@@ -748,6 +748,7 @@ public class Operators
             returnType = DataType.None;
             return null;
         }
+        InterpreterWarnings.CheckOperator(left_,def,right_);
         if (unary && oper.GetParameters().Length != 1)
         {
             throw new ExpressionEvalError(eval, "An unary operator takes only one operand: " + syntax);
@@ -962,10 +963,6 @@ public class Operators
         var lType = left.type;
         var rType = right.type;
         dynamic val1 = left.GetVal(), val2 = right.GetVal();
-        if (lType == TokenType.Unset)
-            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
-        if (rType == TokenType.Unset)
-            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
         return val1.ToString() == val2.ToString();
     }
      [OperatorDefinition(TokenType.Any, TokenType.Any, "===", 5, DataType.Bool)]
@@ -974,10 +971,6 @@ public class Operators
         var lType = left.type;
         var rType = right.type;
         dynamic val1 = left.GetValVar(), val2 = right.GetValVar();
-        if (lType == TokenType.Unset)
-            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
-        if (rType == TokenType.Unset)
-            throw new ExpressionEvalError(null!, "Unset cannot be used as an operand");
         return val1.value.ToString() == val2.value.ToString() && val1.type == val2.type;
     }
     [OperatorDefinition(TokenType.Bool, TokenType.Bool, "||", 8, DataType.Bool)]
