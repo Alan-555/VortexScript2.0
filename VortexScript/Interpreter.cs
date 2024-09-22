@@ -57,7 +57,7 @@ public class Interpreter
         var listOfBs = (
            from domainAssembly in AppDomain.CurrentDomain.GetAssemblies()
            from type in domainAssembly.GetTypes()
-           where typeof(InternalModule).IsAssignableFrom(type)
+           where typeof(InternalStandartLibrary).IsAssignableFrom(type)
            select type).ToArray();
         bool first = true;
         foreach (var type in listOfBs)
@@ -86,6 +86,7 @@ public class Interpreter
             {
                 foreach (var item in constants)
                 {
+                    keywords = [.. keywords, item.Key];
                     SuperGlobals.SuperGlobalVars.Add(item.Key, () => item.Value);
                 }
             }
@@ -532,7 +533,7 @@ public class Interpreter
                 throw new ExpectedTokenError(")");
             }
             string identifier = statement[0..statement.IndexOf('(')];
-            if (!Utils.IsIdentifierValid(identifier))
+            if (!Utils.IsIdentifierValid(identifier,true))
             {
                 throw new InvalidIdentifierError(identifier);
             }
@@ -552,7 +553,7 @@ public class Interpreter
                     type = (DataType)Evaluator.Evaluate(ident[..index], DataType.Type).value;
                     ident = ident[(index+1)..];
                 }
-                if (!Utils.IsIdentifierValid(ident))
+                if (!Utils.IsIdentifierValid(ident,true))
                 {
                     throw new InvalidIdentifierError(ident);
                 }
@@ -765,7 +766,7 @@ public class Interpreter
         }
         bool init = Utils.StringContains(statement, "=");
         string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];
-        if (!Utils.IsIdentifierValid(identifier))
+        if (!Utils.IsIdentifierValid(identifier,true))
         {
             throw new InvalidIdentifierError(identifier);
         }
@@ -1009,7 +1010,7 @@ public class Interpreter
         {
             var type = Evaluator.Evaluate(args[0], DataType.GroupType);
             var message = Evaluator.Evaluate(args[1], DataType.String);
-            InternalModule.ThrowError(type, message.value.ToString());
+            InternalStandartLibrary.ThrowError(type, message.value.ToString());
         }
         else if (args.Length == 1)
         {
@@ -1084,46 +1085,44 @@ public class Interpreter
     {
         return (T)obj;
     }
-
-    // public static bool ReadVar(string identifier, out Variable val,Context? scope = null){
-    //     scope ??= GetCurrentContext();
-    //     var combined = scope.Variables.Concat(SuperGlobals).ToDictionary(x=>x.Key,x=>x.Value);
-    //     var res = combined.TryGetValue(identifier, out val);
-    //     if(!val.unsetable&&val.type==DataType.Unset)
-    //         throw new ReadingUnsetValue(identifier);
-    //     return res;
-    // }
-    public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, bool ignoreTopLevel = false, DataType type = DataType.Any)
+    public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, DataType type = DataType.Any)
     {
         Dictionary<string, V_Variable> vars;
         if (context == null)
         {
+            //gets all variables in the current frame
             vars = Utils.GetAllVars();
         }
         else
         {
+            //use the context variables
             vars = context.Variables;
         }
-        if(ActiveModules.TryGetValue(identifier, out var module)||InternalModules.TryGetValue(identifier, out module)){
+        //try to read a module
+        if(context==null && (ActiveModules.TryGetValue(identifier, out var module)||InternalModules.TryGetValue(identifier, out module))){
             val = V_Variable.Construct(DataType.Module,module,new(){readonly_=true});
             return true;
         }
+        //if no context is present try to read a superglobal
         if (context == null)
         {
             if (TryGetSuperGlobal(identifier, out val, type))
                 return true;
         }
 
+        //try to read a variable from chosen context
         var res = vars.TryGetValue(identifier, out val);
         if (!res)
         {
-            if (context?.ScopeType == ScopeTypeEnum.internal_ || ignoreTopLevel)
+            //if we are in an internal function or the context is set, skip reading top level context of the current frame
+            if (context?.ScopeType == ScopeTypeEnum.internal_ || context==null)
             {
-                return TryGetSuperGlobal(identifier, out val, type);
+                return false;
             }
+            //try to read a variable from the top level context
             if (!GetCurrentFrame().VFile.TopLevelContext.Variables.TryGetValue(identifier, out val))
             {
-                return TryGetSuperGlobal(identifier, out val, type);
+                return false;
             }
             else
             {
@@ -1131,7 +1130,7 @@ public class Interpreter
             }
         }
 
-        if (!val.flags.unsetable && val.type == DataType.Unset)
+        if (!val!.flags.unsetable && val.type == DataType.Unset)
             throw new ReadingUnsetValueError(identifier);
         if (type != DataType.Any && val.type != type)
             throw new UnmatchingDataTypeError(identifier, type.ToString());

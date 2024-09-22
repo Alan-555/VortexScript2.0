@@ -147,7 +147,7 @@ public class VType_Bool : V_Variable
     public VType_Bool(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
     public override object ConvertToCSharpType(string v)
     {
-        return v == "true" || v == "True";
+        return v == "true" || v == "True" || v == "1";
     }
     public override string ToString()
     {
@@ -233,7 +233,7 @@ public class VType_None : V_Variable
     public VType_None(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
     public override object ConvertToCSharpType(string v)
     {
-        return typeof(void);
+        return SuperGlobals.SuperGlobalVars["unset"];
     }
     public override string ToString()
     {

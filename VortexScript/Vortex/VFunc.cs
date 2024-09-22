@@ -38,7 +38,7 @@ public class VFunc
             join = string.Join(",", CSharpFunc!.GetParameters().Select(x => x.Name + ":" + x.ParameterType.ToString()));
         }
         string f = (isInternal ? Identifier[0].ToString().ToLower() + Identifier[1..] : Identifier) + "(" + join + ")";
-        f += " " + returnType.ToString() + " :\t" + (isInternal ? "<internal function>" : string.Join(';', FunctionBody));
+        f += " " + returnType.ToString() + " :\t" + (isInternal ? "<internal function>" : string.Join(" | ", FunctionBody));
         return f;
     }
 }

@@ -5,7 +5,7 @@ using VortexScript.Vortex;
 namespace VortexScript.Definitions;
 
 
-public class InternalModule
+public class InternalStandartLibrary
 {
     [InternalFunc(DataType.Array)]
     public static V_Variable Array(string init)
@@ -13,6 +13,7 @@ public class InternalModule
         var data = Utils.ArgsEval(init, ',') ?? throw new FuncOverloadNotFoundError("array", Utils.StringSplit(init, ',').Length.ToString());
         return V_Variable.Construct(DataType.Array, data);
     }
+
     [InternalFunc(DataType.Type)]
     public static V_Variable TypeOf(V_Variable var)
     {
@@ -79,10 +80,4 @@ public class InternalModule
     }
 
 
-}
-
-public struct InternalModuleDefinition
-{
-    public Dictionary<string, V_Variable> constants;
-    public Dictionary<string, VFunc> functions;
 }

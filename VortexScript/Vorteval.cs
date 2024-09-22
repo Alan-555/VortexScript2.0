@@ -99,6 +99,7 @@ public class Evaluator
             throw new ExpressionEvalError(this, "Empty expression");
         }
         var tokens = Tokenize(expression);
+        InterpreterWarnings.CheckExpression(tokens);
         return RecursiveEval(tokens);
     }
     V_Variable RecursiveEval(List<Token> tokens)
@@ -137,7 +138,13 @@ public class Evaluator
         {
             if (i != tokens.Count - 1 && tokens[i + 1].type == TokenType.Indexer)
             {
-                var index = Evaluate(tokens[i + 1].value, DataType.Number);
+                V_Variable index;
+                try{
+                    index = InternalStandartLibrary.Indexer(int.Parse(tokens[i + 1].value));
+                }
+                catch{
+                    throw new InvalidFormatError(tokens[i + 1].value,"Number");
+                }
                 var variable = tokens[i].GetValVar();
                 try
                 {
@@ -188,7 +195,7 @@ public class Evaluator
             {
                 if (module != null && tokens[i].value == "this")
                     throw new IlegalOperationError("'this' can only be accessed via top-level context.");
-                bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module, module != null);
+                bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module);
 
                 if (module != null)
                     tokens[i - 1] = new(TokenType.Ignore, "");
@@ -202,11 +209,11 @@ public class Evaluator
             {
                 if (module != null)
                 {
-                    throw new ExpressionEvalError(this, $"stdin token is standalone");
+                    throw new ExpressionEvalError(this, $"'_' is a language construct that can only be used in the top-level");
                 }
                 if (Interpreter.itm)
                     Console.Write("_ ");
-                var in_ = Console.ReadLine();
+                var in_ = InternalStdInOut.Read();
                 if (in_ == "")
                     tokens[i] = new(TokenType.Unset, "");
                 else
@@ -261,7 +268,7 @@ public class Evaluator
             {
                 var t = tokens[i];
                 if (t.actualValue == null)
-                    tokens[i] = new(t.type, t.value, V_Variable.ConstructValue(DataType.Array, t.value));
+                    tokens[i] = new(t.type, t.value, InternalStandartLibrary.Array(t.value).value);
 
             }
         }
@@ -396,7 +403,7 @@ public class Evaluator
                 }
                 continue;
             }
-            else if (c == '_'&&!readingVar)
+            else if (c == '%'&&!readingVar)
             {
                 tokens.Add(new(TokenType.Console_in, ""));
             }
@@ -733,7 +740,7 @@ public class Operators
                     right_ = TokenType.Any;
                 }
                 def = new(left_, right_, syntax, currentPrecedence);
-                if (!Operators_.TryGetValue(def, out oper, out precedenceCorrect))
+                if (!Operators_.TryGetValue(def, out oper, out precedenceCorrect)&&precedenceCorrect)
                     throw new ExpressionEvalError(eval, "Unknown operator: " + (oldTypeRight == TokenType.None ? "" : oldTypeRight.ToString()) + syntax + (oldTypeLeft == TokenType.None ? "" : oldTypeLeft.ToString()));
             }
             else
@@ -776,6 +783,8 @@ public class Operators
         else
         {
             //binary
+            if(!left.HasValue||!right.HasValue)
+                throw new ExpressionEvalError(eval, "A binary operator '"+syntax+"'  must take two operands.");
             try
             {
                 result = oper.Invoke(null, parameters: [left, right]);
@@ -960,18 +969,28 @@ public class Operators
     [OperatorDefinition(TokenType.Any, TokenType.Any, "==", 5, DataType.Bool)]
     public static bool Equals(Token left, Token right)
     {
-        var lType = left.type;
-        var rType = right.type;
         dynamic val1 = left.GetVal(), val2 = right.GetVal();
         return val1.ToString() == val2.ToString();
     }
-     [OperatorDefinition(TokenType.Any, TokenType.Any, "===", 5, DataType.Bool)]
+    [OperatorDefinition(TokenType.Any, TokenType.Any, "!=", 5, DataType.Bool)]
+    public static bool NotEquals(Token left, Token right)
+    {
+        dynamic val1 = left.GetVal(), val2 = right.GetVal();
+        return val1.ToString() != val2.ToString();
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Any, "===", 5, DataType.Bool)]
     public static bool EqualsStrict(Token left, Token right)
     {
         var lType = left.type;
         var rType = right.type;
         dynamic val1 = left.GetValVar(), val2 = right.GetValVar();
         return val1.value.ToString() == val2.value.ToString() && val1.type == val2.type;
+    }
+    [OperatorDefinition(TokenType.Any, TokenType.Any, "!==", 5, DataType.Bool)]
+    public static bool NotEqualsStrict(Token left, Token right)
+    {
+        dynamic val1 = left.GetValVar(), val2 = right.GetValVar();
+        return val1.value.ToString() != val2.value.ToString() || val1.type != val2.type;
     }
     [OperatorDefinition(TokenType.Bool, TokenType.Bool, "||", 8, DataType.Bool)]
     public static bool Or(Token left, Token right)

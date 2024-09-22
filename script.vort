@@ -1,4 +1,5 @@
-addStringMath(String a, String b) Number :
-    < (a)n+(b)n
+> _frame
+
+call() :
+    > _frame
 ;
-addStringMath(5,_)

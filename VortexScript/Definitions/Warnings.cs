@@ -7,11 +7,11 @@ public class InterpreterWarnings
     public static void CheckStatement(string statement){
 
     }
-    public static void CheckExpression(Token[] tokens){
+    public static void CheckExpression(List<Token> tokens){
 
     }
     public static void CheckOperator(TokenType left, OperatorDefinition oper, TokenType right){
-        if(left==TokenType.Unset||right==TokenType.Unset&&oper.syntax=="=="){
+        if((left==TokenType.Unset||right==TokenType.Unset)&&oper.syntax=="=="){
             PrintWarning("Use '??' operator instead of any==unset");
         }   
     }

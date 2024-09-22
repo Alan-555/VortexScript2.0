@@ -7,10 +7,11 @@ namespace VortexScript.Definitions;
 public static class SuperGlobals
 {
     public static Dictionary<string, Func<V_Variable>> SuperGlobalVars { get; private set; } = new(){
-        {"true", ()=>V_Variable.Construct(DataType.Bool,true)},
-        {"false", ()=>V_Variable.Construct(DataType.Bool,false)},
-        {"unset",()=>V_Variable.Construct(DataType.Unset,"")},
+        {"true", ()=>V_Variable.Construct(DataType.Bool,true)}, //-> 1==1
+        {"false", ()=>V_Variable.Construct(DataType.Bool,false)},//-> !true
+        {"unset",()=>V_Variable.Construct(DataType.Unset,"")},//-> unset
         {"🌀",()=>V_Variable.Construct(DataType.String,"Vortex script v. "+Interpreter.version)},
+        {"_version",()=>V_Variable.Construct(DataType.String,"Vortex script v. "+Interpreter.version)},
         {"this",()=>V_Variable.Construct(DataType.Module,Interpreter.GetCurrentFrame().VFile.GetFileNameUpper())},
         {"main",()=>V_Variable.Construct(DataType.Module,Interpreter.CallStack.First().ScopeStack.First())},
         {"_frame",()=>V_Variable.Construct(DataType.String,Interpreter.GetCurrentFrame().Name)},
@@ -21,14 +22,21 @@ public static class SuperGlobals
         {"first",()=>V_Variable.Construct(DataType.Indexer,"0")},
         {"last",()=>V_Variable.Construct(DataType.Indexer,"-1")},
         {"inf",()=>V_Variable.Construct(DataType.Number,double.PositiveInfinity)},
+        {"ninf",()=>V_Variable.Construct(DataType.Number,double.NegativeInfinity)},
+        {"NaN",()=>V_Variable.Construct(DataType.Number,double.NaN)},
         {"∞",()=>V_Variable.Construct(DataType.Number,double.PositiveInfinity)},
+        {"Tprimitive",()=>V_Variable.Construct(DataType.Array,"Number,String,Bool")},
+        {"Tgeneric",()=>V_Variable.Construct(DataType.Array,"Any,None,Unset")},
+        {"Tcomplex",()=>V_Variable.Construct(DataType.Array,"Array,Function,GroupType,Module,Type,Error,Indexer")},
+        {"_library",()=>V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray<VContext>(Interpreter.ActiveModules,DataType.Module))},
+        
 
     };
 
     //Math
 
 }
-public class InternalMath : InternalModule
+public class InternalMath : InternalStandartLibrary
 {
     public static readonly V_Variable Pi = V_Variable.Construct(DataType.Number, Math.PI);
     public static readonly V_Variable E = V_Variable.Construct(DataType.Number, Math.E);
@@ -64,7 +72,7 @@ public class InternalMath : InternalModule
         return Math.Pow(a, 1 / b);
     }
 }
-public class InternalRandom : InternalModule
+public class InternalRandom : InternalStandartLibrary
 {
     public static Random? random;
 
@@ -89,22 +97,27 @@ public class InternalRandom : InternalModule
         random ??= new();
     }
 
-    [InternalFunc(DataType.Unset)]
+    [InternalFunc(DataType.None)]
     public static void SetSeed(double a)
     {
         random = new((int)a);
     }
 }
-public class InternalStd : InternalModule
+public class InternalStdInOut : InternalStandartLibrary
 {
-    [InternalFunc(DataType.Unset)]
+    [InternalFunc(DataType.None)]
     public static void Print(string a)
     {
         Console.WriteLine(a);
     }
+    [InternalFunc(DataType.String)]
+    public static string Read()
+    {
+        return Console.ReadLine()!;
+    }
 }
 
-public class InternalClio : InternalModule
+public class InternalClio : InternalStandartLibrary
 {
     public static readonly V_Variable HorsePower = V_Variable.Construct(DataType.Number, -1d);
     public static readonly V_Variable Incidents = V_Variable.Construct(DataType.Array, new VArray());

@@ -306,9 +306,9 @@ class Utils
     {
         return statement.CustomAttributes.ToList().Find(x => x.AttributeType == typeof(T)).ConstructorArguments[index];
     }
-    public static bool IsIdentifierValid(string identifier)
+    public static bool IsIdentifierValid(string identifier,bool declaring = false)
     {
-        if (Interpreter.keywords.Contains(identifier)) return false;
+        if (declaring&&Interpreter.keywords.Contains(identifier)) return false;
         string pattern = @"^[a-zA-Z_🌋][a-zA-Z0-9_🌀🌋]*$";
         Regex regex = new(pattern);
         return regex.IsMatch(identifier);
@@ -341,5 +341,13 @@ class Utils
         ts.Hours, ts.Minutes, ts.Seconds,
         ts.Milliseconds / 10);
         Console.WriteLine($"Proccess '{text}' took " + elapsedTime);
+    }
+
+    public static VArray ConvertDictToVArray<T>(Dictionary<string,T> list, DataType type){
+        VArray ret = new();
+        foreach(var item in list){
+            ret.Add(V_Variable.Construct(type,item.Key));
+        }
+        return ret;
     }
 }

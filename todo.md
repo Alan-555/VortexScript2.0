@@ -5,15 +5,11 @@ Connect as alt for =
 
 # warnings/hint
 
-any==unst - use ?? operator
-
 statements that always force ignore -> warning unreachable code
+x is Number || x is String USE: x is [Number,String]
 
 cool GC
 
 
-x is Number || x is String USE: x is [Number,String]
 
 # bugs
-
-eval: x is Number || x is String
