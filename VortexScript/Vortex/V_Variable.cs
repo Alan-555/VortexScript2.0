@@ -71,7 +71,27 @@ public abstract class V_Variable
     {
         throw new IlegalOperationError($"The type '{type}' is not indexable");
     }
-    public T GetCorrectType<T>()
+    public virtual V_Variable SpecialAdd(V_Variable second)
+    {
+        throw new IlegalOperationError($"The type '{type}' has not add operator");
+    }
+    public virtual V_Variable SpecialSub(V_Variable second)
+    {
+        throw new IlegalOperationError($"The type '{type}' has no sub operator");
+    }
+    public virtual V_Variable SpecialMul(V_Variable second)
+    {
+        throw new IlegalOperationError($"The type '{type}' has no mul operator");
+    }
+    public virtual V_Variable SpecialDiv(V_Variable second)
+    {
+        throw new IlegalOperationError($"The type '{type}' has no div operator");
+    }
+    public virtual V_Variable SpecialClear()
+    {
+        throw new IlegalOperationError($"The type '{type}' has no clear operator");
+    }
+        public T GetCorrectType<T>()
     {
         return (T)value;
     }
@@ -97,6 +117,21 @@ public class VType_Number : V_Variable
         if(double.IsNegativeInfinity((double)value))
             return "-∞";
         return ((double)value).ToString(CultureInfo.InvariantCulture)!;
+    }
+
+    public override V_Variable SpecialAdd(V_Variable second)
+    {
+        if(second.type!=type)
+            throw new InvalidFormatError(second.type.ToString(),type.ToString());
+        value = (double)value+(double)second.value;
+        return this;
+    }
+    public override V_Variable SpecialSub(V_Variable second)
+    {
+        if(second.type!=type)
+            throw new InvalidFormatError(second.type.ToString(),type.ToString());
+        value = (double)value-(double)second.value;
+        return this;
     }
 }
 
@@ -184,6 +219,11 @@ public class VType_Array : V_Variable
         {
             throw new IndexOutOfBoundsError(index.ToString());
         }
+    }
+    public override V_Variable SpecialAdd(V_Variable second)
+    {
+        ((VArray)value).Add(second);
+        return this;
     }
 }
 

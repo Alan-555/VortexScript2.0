@@ -64,8 +64,8 @@ public class Evaluator
         Init();
     }
 
-    const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
-    public readonly Dictionary<Type, DataType> CSTypeToVortex;
+    public const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
+
 
     public static readonly Dictionary<DataType, Type> CSharpDataRepresentations = new(){
         {DataType.String,typeof(string)},
