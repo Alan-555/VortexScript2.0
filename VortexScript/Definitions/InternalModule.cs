@@ -79,5 +79,19 @@ public class InternalStandartLibrary
         return New(DataType.Error, message);
     }
 
+    [InternalFunc(DataType.String)]
+    public static V_Variable FileName(VContext module)
+    {
+        if(module.File == null)
+            return V_Variable.Construct(DataType.String,"<internal>");
+        return V_Variable.Construct(DataType.String,module.File!.Path);
+    }
+
+    [InternalFunc(DataType.Array)]
+    public static V_Variable GetVars(VContext module)
+    {
+        return V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray(module.Variables));
+    }
+
 
 }

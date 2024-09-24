@@ -18,8 +18,8 @@ public class Interpreter
 
 
     //Internal stuff
-    public static MethodInfo[] statements = [];
-    public static Dictionary<string, VContext> InternalModules = new();
+    public static MethodInfo[] statements = []; //all statements are stored here
+    public static Dictionary<string, VContext> InternalModules = new(); //all modules are stored here
     public static Dictionary<string, SpecialAssigment> OperToSpecialAssigment = new(){
         {"+",SpecialAssigment.Add},
         {"-",SpecialAssigment.Remove},
@@ -29,10 +29,11 @@ public class Interpreter
     };
 
     //Memory
-    public static Dictionary<string, VContext> ActiveModules { get; private set; } = [];
-    public static string[] keywords = [];
+    public static Dictionary<string, VContext> ActiveModules { get; private set; } = []; //loaded modules in memory (libary)
+    public static string[] keywords = []; //all reserved keywords are stored here
 
-    public static Stack<VFrame> CallStack { get; private set; } = [];
+    public static Stack<VFrame> CallStack { get; private set; } = []; //the call stack
+    string[] ITM_Buffer = [];
 
     //Instance    
     public VFile File { private set; get; }
@@ -46,14 +47,17 @@ public class Interpreter
 
     public void Init()
     {
+        //load all statements
         statements = Assembly.GetAssembly(typeof(Interpreter))!.GetTypes()
                   .SelectMany(t => t.GetMethods())
                   .Where(m => m.GetCustomAttributes(typeof(MarkStatement), false).Length > 0)
                   .ToArray();
+        //superglobal variables are subject of reserved keywords
         foreach (var var in SuperGlobals.SuperGlobalVars)
         {
             keywords = [.. keywords, var.Key];
         }
+        //load all internal modules
         var listOfBs = (
            from domainAssembly in AppDomain.CurrentDomain.GetAssemblies()
            from type in domainAssembly.GetTypes()
@@ -64,7 +68,7 @@ public class Interpreter
         {
             var method = type
             .GetMethods()
-            .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0)
+            .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0) //get only internal functions
             .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
             .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
             Dictionary<string, V_Variable> constants = [];
@@ -108,7 +112,9 @@ public class Interpreter
         }
 
     }
-    string[] ITM_Buffer = [];
+
+    //
+    
     public void ExecuteFile()
     {
         if (File.Path == Program.InteractiveTermMode)
@@ -631,7 +637,7 @@ public class Interpreter
                     throw new UnknownNameError(module);
                 }
             }
-            if (!ReadVar(identifier, out var func_, context, type: DataType.Function))
+            if (!ReadVar(identifier, out var func_, type: DataType.Function))
             {
                 throw new UnknownNameError(identifier);
             }

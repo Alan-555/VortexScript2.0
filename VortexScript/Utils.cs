@@ -350,4 +350,14 @@ class Utils
         }
         return ret;
     }
+    public static VArray ConvertDictToVArray(Dictionary<string,V_Variable> list){
+        VArray ret = new();
+        foreach(var item in list){
+            var key = V_Variable.Construct(DataType.String,item.Key);
+            var val = V_Variable.Construct(item.Value.type,item.Value.value);
+            var arr = new VArray(){key,val};
+            ret.Add(V_Variable.Construct(DataType.Array,arr));
+        }
+        return ret;
+    }
 }

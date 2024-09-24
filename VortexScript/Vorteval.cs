@@ -35,6 +35,7 @@ public class Evaluator
     public static void Init()
     {
         if (InitDone) return;
+        var x = CSharpDataRepresentations.ToDictionary(x => x.Key, x => x.Value);
         InitDone = true;
         Operators.Init();
         foreach (var oper in Operators.Operators_)
@@ -53,16 +54,18 @@ public class Evaluator
             if (oper.Key.precedence > HighestPrecedence)
                 HighestPrecedence = oper.Key.precedence;
         }
+
     }
 
 
     public Evaluator()
     {
+        
         Init();
     }
 
     const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
-
+    public readonly Dictionary<Type, DataType> CSTypeToVortex;
 
     public static readonly Dictionary<DataType, Type> CSharpDataRepresentations = new(){
         {DataType.String,typeof(string)},
