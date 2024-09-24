@@ -20,12 +20,12 @@ public class Interpreter
     //Internal stuff
     public static MethodInfo[] statements = [];
     public static Dictionary<string, VContext> InternalModules = new();
-    public static Dictionary<string, SpecialAssigment> OperToSpecialAssigment = new(){
-        {"+",SpecialAssigment.Add},
-        {"-",SpecialAssigment.Remove},
-        {".",SpecialAssigment.Clear},
-        {"*",SpecialAssigment.Mult},
-        {"/",SpecialAssigment.Div},
+    public static Dictionary<string, MethodInfo> OperToSpecialAssigment = new(){
+        {"+",typeof(V_Variable).GetMethod(nameof(V_Variable.SpecialAdd))!},
+        {"-",typeof(V_Variable).GetMethod(nameof(V_Variable.SpecialSub))!},
+        {"*",typeof(V_Variable).GetMethod(nameof(V_Variable.SpecialMul))!},
+        {"/",typeof(V_Variable).GetMethod(nameof(V_Variable.SpecialDiv))!},
+        {".",typeof(V_Variable).GetMethod(nameof(V_Variable.SpecialClear))!},
     };
 
     //Memory
@@ -244,7 +244,7 @@ public class Interpreter
                 if (FuncDeclaration(statement))
                     return;
                 else
-                if (CallFunctionStatement(statement, out _, GetCurrentContext()))
+                if (CallFunctionStatement(statement, out _))
                 {
                     return;
                 }
@@ -473,7 +473,6 @@ public class Interpreter
                 throw new ExpectedTokenError("identifier");
             }
             var middle = Utils.StringIndexOf(statement, "=");
-            char special = statement[middle - 1];
             if (middle < 1)
             {
                 throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
@@ -483,17 +482,23 @@ public class Interpreter
             {
                 throw new UnexpectedEndOfStatementError("Expression");
             }
-            string identifier = statement[0..(middle - 1)];
-            if (middle == 1)
-            {
-                identifier = statement[0].ToString();
+            string identifier="";
+            int i =0;
+            while(Evaluator.identifierValidChars.Contains(statement[i])){
+                identifier+=statement[i];
+                i++;
             }
+            string special = statement[i..middle].Trim();
             string expression = statement[(middle + 1)..];
             if (Utils.IsIdentifierValid(identifier))
             {
-                if ("+-*/.".Contains(special.ToString()) && OperToSpecialAssigment.TryGetValue(special.ToString(), out var spec))
-                {
-                    return SetSpecial(identifier, Evaluator.Evaluate(expression), spec);
+                if(OperToSpecialAssigment.TryGetValue(special,out var spec)){
+                    if(!ReadVar(identifier,out var var)){
+                        throw new UnknownNameError(identifier);
+                    }
+                    
+                    spec.Invoke(var,[Evaluator.Evaluate(expression)]);
+                    return true;
                 }
 
 

@@ -78,6 +78,15 @@ public class InternalStandartLibrary
     {
         return New(DataType.Error, message);
     }
+    [InternalFunc(DataType.Array)]
+    public static V_Variable Unpack(V_Variable first_, V_Variable second_)
+    {
+        var first = (VArray)first_.value; var second = (VArray)second_.value;
+        V_Variable[] newArr= new V_Variable[first.Count];
+        first.CopyTo(newArr);
+        VArray newArray =[.. newArr, .. second];
+        return V_Variable.Construct(DataType.Array,newArray);
+    }
 
 
 }

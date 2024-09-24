@@ -61,7 +61,7 @@ public class Evaluator
         Init();
     }
 
-    const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
+    public const string identifierValidChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_🌀🌋";
 
 
     public static readonly Dictionary<DataType, Type> CSharpDataRepresentations = new(){
