@@ -30,7 +30,7 @@ public abstract class V_Variable
             { DataType.Int, typeof(VType_Int)},
             { DataType.Function, typeof(VType_Function)},
         };
-        
+
     public DataType type;
     public object value;
 
@@ -87,11 +87,11 @@ public abstract class V_Variable
     {
         throw new IlegalOperationError($"The type '{type}' has no div operator");
     }
-    public virtual V_Variable SpecialClear()
+    public virtual V_Variable SpecialClear(object dummy)
     {
         throw new IlegalOperationError($"The type '{type}' has no clear operator");
     }
-        public T GetCorrectType<T>()
+    public T GetCorrectType<T>()
     {
         return (T)value;
     }
@@ -99,38 +99,54 @@ public abstract class V_Variable
 
 public class VType_Number : V_Variable
 {
-    public VType_Number(DataType type, object value, V_VarFlags flags) : base(type, value, flags) {
-        if(value!=null){
-            if((double)value==0)
+    public VType_Number(DataType type, object value, V_VarFlags flags) : base(type, value, flags)
+    {
+        if (value != null)
+        {
+            if ((double)value == 0)
                 this.value = 0d;
         }
-       
-     }
+
+    }
     public override object ConvertToCSharpType(string v)
     {
         return double.Parse(v, CultureInfo.InvariantCulture);
     }
     public override string ToString()
     {
-        if(double.IsPositiveInfinity((double)value))
+        if (double.IsPositiveInfinity((double)value))
             return "∞";
-        if(double.IsNegativeInfinity((double)value))
+        if (double.IsNegativeInfinity((double)value))
             return "-∞";
         return ((double)value).ToString(CultureInfo.InvariantCulture)!;
     }
 
     public override V_Variable SpecialAdd(V_Variable second)
     {
-        if(second.type!=type)
-            throw new InvalidFormatError(second.type.ToString(),type.ToString());
-        value = (double)value+(double)second.value;
+        if (second.type != type)
+            throw new InvalidFormatError(second.type.ToString(), type.ToString());
+        value = (double)value + (double)second.value;
         return this;
     }
     public override V_Variable SpecialSub(V_Variable second)
     {
-        if(second.type!=type)
-            throw new InvalidFormatError(second.type.ToString(),type.ToString());
-        value = (double)value-(double)second.value;
+        if (second.type != type)
+            throw new InvalidFormatError(second.type.ToString(), type.ToString());
+        value = (double)value - (double)second.value;
+        return this;
+    }
+    public override V_Variable SpecialMul(V_Variable second)
+    {
+        if (second.type != type)
+            throw new InvalidFormatError(second.type.ToString(), type.ToString());
+        value = (double)value * (double)second.value;
+        return this;
+    }
+    public override V_Variable SpecialDiv(V_Variable second)
+    {
+        if (second.type != type)
+            throw new InvalidFormatError(second.type.ToString(), type.ToString());
+        value = (double)value / (double)second.value;
         return this;
     }
 }
@@ -140,7 +156,7 @@ public class VType_Int : V_Variable
     public VType_Int(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
     public override object ConvertToCSharpType(string v)
     {
-        if (v == "∞"||v == "-∞" || v == "NaN")
+        if (v == "∞" || v == "-∞" || v == "NaN")
         {
             throw new ArgumentError("Int may not be infinite or NaN");
         }
@@ -150,6 +166,7 @@ public class VType_Int : V_Variable
     {
         return value.ToString()!;
     }
+
 }
 
 public class VType_String : V_Variable
@@ -175,6 +192,16 @@ public class VType_String : V_Variable
         {
             throw new IndexOutOfBoundsError(index.ToString());
         }
+    }
+    public override V_Variable SpecialAdd(V_Variable second)
+    {
+        value = (string)value + second.value.ToString();
+        return this;
+    }
+    public override V_Variable SpecialSub(V_Variable second)
+    {
+        value = ((string)value).Replace(second.ToString(), "")!;
+        return this;
     }
 }
 public class VType_Bool : V_Variable
@@ -223,6 +250,20 @@ public class VType_Array : V_Variable
     public override V_Variable SpecialAdd(V_Variable second)
     {
         ((VArray)value).Add(second);
+        return this;
+    }
+    public override V_Variable SpecialSub(V_Variable second)
+    {
+        if(second.type==DataType.Indexer){
+            ((VArray)value).RemoveAt(Convert.ToInt32(second.value));
+            return this;
+        }
+        ((VArray)value).RemoveAll(x=>x.value.Equals(second.value));
+        return this;
+    }
+    public override V_Variable SpecialClear(object dummy)
+    {
+        ((VArray)value).Clear();
         return this;
     }
 }

@@ -41,6 +41,11 @@ public class InternalStandartLibrary
     {
         return V_Variable.Construct(DataType.Indexer, val);
     }
+    [InternalFunc(DataType.Indexer,true)]
+    public static V_Variable I(int val)
+    {
+        return V_Variable.Construct(DataType.Indexer, val);
+    }
     [InternalFunc(DataType.None)]
     public static V_Variable ThrowError(V_Variable v, string message)
     {

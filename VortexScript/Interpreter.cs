@@ -66,11 +66,17 @@ public class Interpreter
         bool first = true;
         foreach (var type in listOfBs)
         {
+            MethodInfo mi_;
             var method = type
             .GetMethods()
             .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0) //get only internal functions
-            .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) { CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
-            .ToDictionary(x => { var id = x.Identifier; id = id[0].ToString().ToLower() + id[1..]; return id; }, x => x);
+            .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) {ForceUppercase=(bool)Utils.GetStatementAttribute<InternalFunc>(mi, 1).Value!, CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
+            .ToDictionary(x =>
+            {
+                var id = x.Identifier;
+                id = x.ForceUppercase ? id : id[0].ToString().ToLower() + id[1..];
+                return id;
+            }, x => x);
             Dictionary<string, V_Variable> constants = [];
             type.GetFields(BindingFlags.Public | BindingFlags.Static)
             .ToList()
@@ -114,7 +120,7 @@ public class Interpreter
     }
 
     //
-    
+
     public void ExecuteFile()
     {
         if (File.Path == Program.InteractiveTermMode)
@@ -142,7 +148,7 @@ public class Interpreter
                         ExecuteLines([.. list]);
                     }
                 }
-                ITM_Buffer = [..ITM_Buffer, Console.ReadLine()!];
+                ITM_Buffer = [.. ITM_Buffer, Console.ReadLine()!];
                 ExecuteLines(ITM_Buffer);
             }
         }
@@ -154,7 +160,7 @@ public class Interpreter
 
     V_Variable? ExecuteLines(string[] lines)
     {
-        while(GetCurrentFrame().currentLine < lines.Length)
+        while (GetCurrentFrame().currentLine < lines.Length)
         {
 
             string line;
@@ -200,11 +206,11 @@ public class Interpreter
                 VortexError.ThrowError(GetCurrentContext().ErrorRaised!);
         }
         if (GetCurrentContext().Depth != 0 && !itm)
-            {
-                if (GetCurrentContext().FuncBeingRead != null)
-                    VortexError.ThrowError(new FunctionBodyLeakError((GetCurrentContext().StartLine + 1).ToString()));
-                else
-                    VortexError.ThrowError(new ScopeLeakError((GetCurrentContext().StartLine + 1).ToString()));
+        {
+            if (GetCurrentContext().FuncBeingRead != null)
+                VortexError.ThrowError(new FunctionBodyLeakError((GetCurrentContext().StartLine + 1).ToString()));
+            else
+                VortexError.ThrowError(new ScopeLeakError((GetCurrentContext().StartLine + 1).ToString()));
         }
         return null;
     }
@@ -395,9 +401,11 @@ public class Interpreter
                     GetCurrentContext().SubsequentFramesIgnore = true;
                     GetCurrentContext().ErrorRaised = null;
                 }
-                if(context.ScopeType == ScopeTypeEnum.loopScope&&!context.Ignore){
-                    if((bool)Evaluator.Evaluate(context.LoopCondition, DataType.Bool).value){
-                        GetCurrentFrame().currentLine = context.StartLine-1;
+                if (context.ScopeType == ScopeTypeEnum.loopScope && !context.Ignore)
+                {
+                    if ((bool)Evaluator.Evaluate(context.LoopCondition, DataType.Bool).value)
+                    {
+                        GetCurrentFrame().currentLine = context.StartLine - 1;
                     }
                 }
             }
@@ -484,26 +492,37 @@ public class Interpreter
                 throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
 
             }
-            if (middle + 1 == statement.Length)
+            string identifier = "";
+            int i = 0;
+            while (Evaluator.identifierValidChars.Contains(statement[i]))
             {
-                throw new UnexpectedEndOfStatementError("Expression");
-            }
-            string identifier="";
-            int i =0;
-            while(Evaluator.identifierValidChars.Contains(statement[i])){
-                identifier+=statement[i];
+                identifier += statement[i];
                 i++;
             }
             string special = statement[i..middle].Trim();
+            if (middle + 1 == statement.Length && special != ".")
+            {
+                throw new UnexpectedEndOfStatementError("Expression");
+            }
             string expression = statement[(middle + 1)..];
             if (Utils.IsIdentifierValid(identifier))
             {
-                if(OperToSpecialAssigment.TryGetValue(special,out var spec)){
-                    if(!ReadVar(identifier,out var var)){
+                if (OperToSpecialAssigment.TryGetValue(special, out var spec))
+                {
+                    if (!ReadVar(identifier, out var var))
+                    {
                         throw new UnknownNameError(identifier);
                     }
-                    
-                    spec.Invoke(var,[Evaluator.Evaluate(expression)]);
+                    if(var.flags.readonly_)
+                    {
+                        throw new AssigmentToReadonlyVarError(identifier);
+                    }
+                    if (spec.Name == nameof(V_Variable.SpecialClear))
+                    {
+                        spec.Invoke(var, [null]);
+                        return true;
+                    }
+                    spec.Invoke(var, [Evaluator.Evaluate(expression)]);
                     return true;
                 }
 
@@ -544,7 +563,7 @@ public class Interpreter
                 throw new ExpectedTokenError(")");
             }
             string identifier = statement[0..statement.IndexOf('(')];
-            if (!Utils.IsIdentifierValid(identifier,true))
+            if (!Utils.IsIdentifierValid(identifier, true))
             {
                 throw new InvalidIdentifierError(identifier);
             }
@@ -558,13 +577,14 @@ public class Interpreter
             foreach (var arg_ in argsArray)
             {
                 var ident = arg_.Trim();
-                var index = Utils.StringIndexOf(ident," ");
+                var index = Utils.StringIndexOf(ident, " ");
                 DataType? type = null;
-                if(index!=-1){
+                if (index != -1)
+                {
                     type = (DataType)Evaluator.Evaluate(ident[..index], DataType.Type).value;
-                    ident = ident[(index+1)..];
+                    ident = ident[(index + 1)..];
                 }
-                if (!Utils.IsIdentifierValid(ident,true))
+                if (!Utils.IsIdentifierValid(ident, true))
                 {
                     throw new InvalidIdentifierError(ident);
                 }
@@ -572,11 +592,13 @@ public class Interpreter
                 {
                     throw new DuplicateVariableError(ident);
                 }
-                if(type.HasValue){
-                    argsList.Add(new(ident){enforcedType=(DataType)type});                
+                if (type.HasValue)
+                {
+                    argsList.Add(new(ident) { enforcedType = (DataType)type });
                 }
-                else{
-                    argsList.Add(new(ident));                
+                else
+                {
+                    argsList.Add(new(ident));
                 }
             }
             VFunc func = new(identifier, File, [.. argsList], GetCurrentFrame().currentLine);
@@ -777,7 +799,7 @@ public class Interpreter
         }
         bool init = Utils.StringContains(statement, "=");
         string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];
-        if (!Utils.IsIdentifierValid(identifier,true))
+        if (!Utils.IsIdentifierValid(identifier, true))
         {
             throw new InvalidIdentifierError(identifier);
         }
@@ -1068,11 +1090,12 @@ public class Interpreter
     {
         var condition = Utils.StringSplit(statement, ' ')[1];
         GetCurrentContext().LoopCondition = condition;
-        if((bool)Evaluator.Evaluate(condition,DataType.Bool).value==false){
+        if ((bool)Evaluator.Evaluate(condition, DataType.Bool).value == false)
+        {
             GetCurrentContext().SubsequentFramesIgnore = true;
             GetCurrentContext().Ignore = true;
         }
-        
+
     }
     [MarkStatement("break", false)]
     public void BreakStatement(string statement)
@@ -1082,11 +1105,13 @@ public class Interpreter
         {
             context.Ignore = true;
             context.SubsequentFramesIgnore = true;
-            if(context.ScopeType==ScopeTypeEnum.loopScope){
+            if (context.ScopeType == ScopeTypeEnum.loopScope)
+            {
                 found = true;
             }
         }
-        if(!found){
+        if (!found)
+        {
             throw new IlegalOperationError("Could not find a loop to break from");
         }
     }
@@ -1110,8 +1135,9 @@ public class Interpreter
             vars = context.Variables;
         }
         //try to read a module
-        if(context==null && (ActiveModules.TryGetValue(identifier, out var module)||InternalModules.TryGetValue(identifier, out module))){
-            val = V_Variable.Construct(DataType.Module,module,new(){readonly_=true});
+        if (context == null && (ActiveModules.TryGetValue(identifier, out var module) || InternalModules.TryGetValue(identifier, out module)))
+        {
+            val = V_Variable.Construct(DataType.Module, module, new() { readonly_ = true });
             return true;
         }
         //if no context is present try to read a superglobal
@@ -1126,7 +1152,7 @@ public class Interpreter
         if (!res)
         {
             //if we are in an internal function or the context is set, skip reading top level context of the current frame
-            if (context?.ScopeType == ScopeTypeEnum.internal_ || context==null)
+            if (context?.ScopeType == ScopeTypeEnum.internal_ || context == null)
             {
                 return false;
             }
@@ -1223,62 +1249,6 @@ public class Interpreter
         }
         return false;
     }
-    public static bool SetSpecial(string identifier, V_Variable v, SpecialAssigment sa)//TODO: refactor
-    {
-        V_Variable old = null;
-        foreach (var Context in GetCurrentFrame().ScopeStack)
-        {
-            if (Context.Variables.TryGetValue(identifier, out old))
-            {
-                if (old.flags.readonly_)
-                    throw new AssigmentToReadonlyVarError(identifier);
-            }
-        }
-        if (old.Equals(default(V_Variable)))
-        {
-            return false;
-        }
-        string oper = "";
-        switch (sa)
-        {
-            case SpecialAssigment.Add:
-                oper = "+";
-                break;
-            case SpecialAssigment.Remove:
-                oper = "-";
-                break;
-            case SpecialAssigment.Clear:
-                break;
-            case SpecialAssigment.Mult:
-                oper = "*";
-                break;
-            case SpecialAssigment.Div:
-                oper = "/";
-                break;
-        }
-        if (old.type == DataType.Array)
-        {
-            if (oper == "+")
-            {
-                return ArrayAdd(identifier, v);
-            }
-            else if (oper == "-")
-            {
-                ArrayRemove(identifier, v);
-                return true;
-            }
-            else
-            {
-                throw new IlegalOperationError("Operator " + oper + " is not a valid array operator for compound assigment");
-            }
-        }
-        else
-        {
-            string expression = (old.type == DataType.String ? "\"" + old.value + "\"" : old.value) + oper + (v.type == DataType.String ? "\"" + v.value + "\"" : v.value);
-            var result = Evaluator.Evaluate(expression);
-            return SetVar(identifier, result);
-        }
-    }
 
     public static bool DeclareVar(string identifier, V_Variable var)
     {
@@ -1307,14 +1277,4 @@ enum StatementAttributes
     mewScope = 1,
     scopeType = 2,
     endScope = 3
-}
-
-public enum SpecialAssigment
-{
-    Add,
-    Remove,
-    Clear,
-    Mult,
-    Div,
-
 }

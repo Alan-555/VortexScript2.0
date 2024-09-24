@@ -22,10 +22,12 @@ public class MarkStatement : System.Attribute
 public class InternalFunc : Attribute
 {
     public DataType ReturnType { get; set; }
+    public bool ForceUppercase { get; set; } = false;
 
-    public InternalFunc(DataType returnType)
+    public InternalFunc(DataType returnType, bool forceUppercase = false)
     {
         ReturnType = returnType;
+        ForceUppercase = forceUppercase;
     }
 
 }

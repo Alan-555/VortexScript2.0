@@ -28,7 +28,7 @@ public static class SuperGlobals
         {"Tprimitive",()=>V_Variable.Construct(DataType.Array,"Number,String,Bool")},
         {"Tgeneric",()=>V_Variable.Construct(DataType.Array,"Any,None,Unset")},
         {"Tcomplex",()=>V_Variable.Construct(DataType.Array,"Array,Function,GroupType,Module,Type,Error,Indexer")},
-        {"_library",()=>V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray<VContext>(Interpreter.ActiveModules,DataType.Module))},
+        {"_library",()=>V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray<VContext>(Interpreter.ActiveModules,DataType.Module),new(){readonly_=true})},
         
 
     };

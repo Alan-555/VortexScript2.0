@@ -12,6 +12,7 @@ public class VFunc
     public string[] FunctionBody { get; set; } = [];
     public int StartLine { get; private set; }
     public MethodInfo? CSharpFunc { get; set; } = null;
+    public bool ForceUppercase { get; set; } = false;
     public DataType returnType { get; set; } = DataType.Any;
 
     public VFunc(string indetifier, VFile file, VFuncArg[] args, int startLine)
@@ -37,7 +38,7 @@ public class VFunc
         {
             join = string.Join(",", CSharpFunc!.GetParameters().Select(x => x.Name + ":" + x.ParameterType.Name));
         }
-        string f = (isInternal ? Identifier[0].ToString().ToLower() + Identifier[1..] : Identifier) + "(" + join + ")";
+        string f = (isInternal ? (ForceUppercase? Identifier : Identifier[0].ToString().ToLower() + Identifier[1..]) : Identifier) + "(" + join + ")";
         f += " " + returnType.ToString() + " :\t" + (isInternal ? "<internal function>" : string.Join(" | ", FunctionBody));
         return f;
     }
