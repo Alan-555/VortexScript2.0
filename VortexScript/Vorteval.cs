@@ -279,7 +279,7 @@ public class Evaluator
         return tokens;
 
     }
-    public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)//TODO: rewrite, add generic support for int and make operators better
+    public bool ProccessOperators(List<Token> tokens, int priority, out List<Token> tokensOut)
     {
         int index = 0;
         bool modified = false;

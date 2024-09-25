@@ -38,8 +38,10 @@ public static class SuperGlobals
 }
 public class InternalMath : InternalStandartLibrary
 {
-    public static readonly V_Variable Pi = V_Variable.Construct(DataType.Number, Math.PI);
-    public static readonly V_Variable E = V_Variable.Construct(DataType.Number, Math.E);
+    public static readonly V_Variable Pi = V_Variable.Construct(DataType.Number, Math.PI,new(){readonly_=true});
+    public static readonly V_Variable E = V_Variable.Construct(DataType.Number, Math.E,new(){readonly_=true});
+    public static readonly V_Variable Rad = V_Variable.Construct(DataType.Number, 1d/180d*Math.PI,new(){readonly_=true});
+     public static readonly V_Variable Deg = V_Variable.Construct(DataType.Number, 1/Math.PI*180,new(){readonly_=true});
 
     [InternalFunc(DataType.Number)]
     public static double Max(double a, double b)

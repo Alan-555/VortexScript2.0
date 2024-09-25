@@ -384,7 +384,7 @@ public class VType_Indexer : V_Variable
 
     public override string ToString()
     {
-        return "I("+value.ToString()!+")";
+        return value.ToString()!;
     }
 }
 

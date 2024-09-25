@@ -70,7 +70,7 @@ public class Interpreter
             var method = type
             .GetMethods()
             .Where(m => m.GetCustomAttributes(typeof(InternalFunc), false).Length > 0) //get only internal functions
-            .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) {ForceUppercase=(bool)Utils.GetStatementAttribute<InternalFunc>(mi, 1).Value!, CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
+            .Select(mi => new VFunc(mi.Name, null!, Utils.ConvertMethodInfoToArgs(mi), -1) { ForceUppercase = (bool)Utils.GetStatementAttribute<InternalFunc>(mi, 1).Value!, CSharpFunc = mi, returnType = (DataType)Utils.GetStatementAttribute<InternalFunc>(mi, 0).Value! })
             .ToDictionary(x =>
             {
                 var id = x.Identifier;
@@ -90,7 +90,7 @@ public class Interpreter
             });
             foreach (var item in method)
             {
-                constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value));
+                constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value,new(){readonly_=true}));
             }
             if (first)
             {
@@ -493,9 +493,21 @@ public class Interpreter
 
             }
             string identifier = "";
+            VContext module = null!;
             int i = 0;
-            while (Evaluator.identifierValidChars.Contains(statement[i]))
+            while (Evaluator.identifierValidChars.Contains(statement[i]) || statement[i] == '.')
             {
+                if (statement[i] == '.')
+                {
+                    if (!ReadVar(identifier, out var val, type: DataType.Module))
+                    {
+                        throw new UnknownNameError(identifier);
+                    }
+                    module = (VContext)val!.value;
+                    identifier = "";
+                    i++;
+                    continue;
+                }
                 identifier += statement[i];
                 i++;
             }
@@ -505,21 +517,23 @@ public class Interpreter
                 throw new UnexpectedEndOfStatementError("Expression");
             }
             string expression = statement[(middle + 1)..];
-            if(special=="."&&expression.Trim()!=""){
+            if (special == "." && expression.Trim() != "")
+            {
                 throw new UnexpectedTokenError(expression);
             }
             if (Utils.IsIdentifierValid(identifier))
             {
+                if (!ReadVar(identifier, out var var, module))
+                {
+                    throw new UnknownNameError(identifier);
+                }
+                if (var!.flags.readonly_)
+                {
+                    throw new AssigmentToReadonlyVarError(identifier);
+                }
+
                 if (OperToSpecialAssigment.TryGetValue(special, out var spec))
                 {
-                    if (!ReadVar(identifier, out var var))
-                    {
-                        throw new UnknownNameError(identifier);
-                    }
-                    if(var.flags.readonly_)
-                    {
-                        throw new AssigmentToReadonlyVarError(identifier);
-                    }
                     if (spec.Name == nameof(V_Variable.SpecialClear))
                     {
                         spec.Invoke(var, [null]);
@@ -528,16 +542,8 @@ public class Interpreter
                     spec.Invoke(var, [Evaluator.Evaluate(expression)]);
                     return true;
                 }
-
-
-                if (SetVar(identifier, Evaluator.Evaluate(expression)))
-                {
-                    return true;
-                }
-                else
-                {
-                    throw new UnknownNameError(identifier);
-                }
+                SetVar(identifier,Evaluator.Evaluate(expression),module);
+                return true;
             }
         }
         return false;
@@ -667,7 +673,7 @@ public class Interpreter
                     throw new UnknownNameError(module);
                 }
             }
-            if (!ReadVar(identifier, out var func_, type: DataType.Function))
+            if (!ReadVar(identifier, out var func_, context, type: DataType.Function))
             {
                 throw new UnknownNameError(identifier);
             }
@@ -1134,12 +1140,12 @@ public class Interpreter
         }
         else
         {
-            if(context.Name=="Released")
+            if (context.Name == "Released")
                 throw new AccessingReleasedModuleError("unknown");
             //use the context variables
             vars = context.Variables;
         }
-        
+
         //try to read a module
         if (context == null && (ActiveModules.TryGetValue(identifier, out var module) || InternalModules.TryGetValue(identifier, out module)))
         {
@@ -1176,7 +1182,7 @@ public class Interpreter
         if (!val!.flags.unsetable && val.type == DataType.Unset)
             throw new ReadingUnsetValueError(identifier);
         if (type != DataType.Any && val.type != type)
-            throw new UnmatchingDataTypeError(identifier, type.ToString());
+            throw new UnmatchingDataTypeError(identifier+"("+val.type.ToString()+")", type.ToString());
         return res;
     }
     public static bool TryGetSuperGlobal(string identifier, out V_Variable? val, DataType type = DataType.Any)

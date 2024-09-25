@@ -95,7 +95,7 @@ public class IlegalStatementContextError(params string[] args) : VortexError("Th
 public class ScopeLeakError(params string[] args) : VortexError("The scope that began on line {0} has leaked.", ErrorType.Critical, args);
 public class FunctionBodyLeakError(params string[] args) : VortexError("The function body that began on line {0} has leaked.", ErrorType.Critical, args);
 public class InvalidIdentifierError(params string[] args) : VortexError("The identifier '{0}' is not valid. Identifiers must begin with a letter or an '_', only letters, numbers and '_' are allowed and it musn't be a reserved keyword. ", ErrorType.Syntax, args);
-public class UnmatchingDataTypeError(params string[] args) : VortexError(args.Length == 0 ? "Unmatching data type" : "Unmatching data type. Could not convert from {0} to {1}", ErrorType.Runtime, args);
+public class UnmatchingDataTypeError(params string[] args) : VortexError(args.Length == 0 ? "Unmatching data type" : "Unmatching data type. Could not convert {0} to {1}", ErrorType.Runtime, args);
 public class UnknownNameError(params string[] args) : VortexError("The name '{0}' does not exist in the current context, or it might not match the required type, or it might be an internal name", ErrorType.Runtime, args);
 public class ReadingUnsetValueError(params string[] args) : VortexError("The variable with indetifier'{0}' is unset (Declare using '$?' to allow for unset values)", ErrorType.Runtime, args);
 public class IlegalContextDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.", ErrorType.Syntax, args);
