@@ -54,7 +54,7 @@ public class VortexError : Exception
     public static void ThrowError(VortexError error)
     {
         Console.WriteLine("Error: ");
-        Console.Write(error.GetType().ToString().Replace("Vortex.", "") + " has been raised: ");
+        Console.Write(error.GetType().Name + " has been raised: ");
         Console.WriteLine(error.message + "\n\t" + error.info);
         if (ErrorHints.TryGetValue(error.info, out var val))
         {
@@ -112,3 +112,5 @@ public class IlegalOperationError(params string[] args) : VortexError("{0}", Err
 public class IndexOutOfBoundsError(params string[] args) : VortexError("Index '{0}' was outside of the Indexeble's bounds.", ErrorType.Runtime, args);
 public class UnmatchingGroupTypeError(params string[] args) : VortexError("The group type '{0}' does not match the group type '{1}'.", ErrorType.Runtime, args);
 public class AssertionFailedError(params string[] args) : VortexError("Assert failed. Expected '{0}' but got '{1}'.", ErrorType.Runtime, args);
+
+public class AccessingReleasedModuleError(params string[] args) : VortexError("The module with indetifier '{0}' has been released", ErrorType.Runtime, args);

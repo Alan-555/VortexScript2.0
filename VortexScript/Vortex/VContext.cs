@@ -41,6 +41,7 @@ public class VContext
         if (File != null)
             File.TopLevelContext = null;
         File = null;
+        Variables.Clear();
     }
 
     public override string ToString()

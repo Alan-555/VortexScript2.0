@@ -255,8 +255,15 @@ public class VType_Array : V_Variable
     public override V_Variable SpecialSub(V_Variable second)
     {
         if(second.type==DataType.Indexer){
-            ((VArray)value).RemoveAt(Convert.ToInt32(second.value));
-            return this;
+            int i = Convert.ToInt32(second.value);
+            try{
+                if(i<0) i = ((VArray)value).Count+i;
+                ((VArray)value).RemoveAt(i);
+                return this;
+            }
+            catch(IndexOutOfRangeException){
+                throw new IndexOutOfBoundsError(i+"");
+            }
         }
         ((VArray)value).RemoveAll(x=>x.value.Equals(second.value));
         return this;
@@ -377,7 +384,7 @@ public class VType_Indexer : V_Variable
 
     public override string ToString()
     {
-        return value.ToString()!;
+        return "I("+value.ToString()!+")";
     }
 }
 

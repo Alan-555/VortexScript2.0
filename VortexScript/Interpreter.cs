@@ -505,6 +505,9 @@ public class Interpreter
                 throw new UnexpectedEndOfStatementError("Expression");
             }
             string expression = statement[(middle + 1)..];
+            if(special=="."&&expression.Trim()!=""){
+                throw new UnexpectedTokenError(expression);
+            }
             if (Utils.IsIdentifierValid(identifier))
             {
                 if (OperToSpecialAssigment.TryGetValue(special, out var spec))
@@ -1131,9 +1134,12 @@ public class Interpreter
         }
         else
         {
+            if(context.Name=="Released")
+                throw new AccessingReleasedModuleError("unknown");
             //use the context variables
             vars = context.Variables;
         }
+        
         //try to read a module
         if (context == null && (ActiveModules.TryGetValue(identifier, out var module) || InternalModules.TryGetValue(identifier, out module)))
         {
