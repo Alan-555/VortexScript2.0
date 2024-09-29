@@ -4,3 +4,7 @@ fib(a) :
     ;
     < fib(a-1)+fib(a-2)
 ;
+
+in() :
+    < StdInOut.read()
+;

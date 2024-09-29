@@ -212,15 +212,12 @@ public class Evaluator
             {
                 if (module != null)
                 {
-                    throw new ExpressionEvalError(this, $"'_' is a language construct that can only be used in the top-level");
+                    throw new ExpressionEvalError(this, $"'%' is a language construct that can only be used in the top-level");
                 }
                 if (Interpreter.itm)
-                    Console.Write("_ ");
-                var in_ = InternalStdInOut.Read();
-                if (in_ == "")
-                    tokens[i] = new(TokenType.Unset, "");
-                else
-                    tokens[i] = new(TokenType.String, in_);
+                    Console.Write("% ");
+                tokens[i] = InternalStdInOut.TokenRead();
+                
 
             }
             else if (tokens[i].type == TokenType.Function)

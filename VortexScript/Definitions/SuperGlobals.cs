@@ -17,8 +17,6 @@ public static class SuperGlobals
         {"_frame",()=>V_Variable.Construct(DataType.String,Interpreter.GetCurrentFrame().Name)},
         {"_depth",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentContext().Depth)},
         {"_line",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentFrame().currentLine)},
-        {"none",()=>V_Variable.Construct(DataType.None,"none")},
-        {"any",()=>V_Variable.Construct(DataType.Any,"any")},
         {"first",()=>V_Variable.Construct(DataType.Indexer,"0")},
         {"last",()=>V_Variable.Construct(DataType.Indexer,"-1")},
         {"inf",()=>V_Variable.Construct(DataType.Number,double.PositiveInfinity)},
@@ -113,9 +111,32 @@ public class InternalStdInOut : InternalStandartLibrary
         Console.WriteLine(a);
     }
     [InternalFunc(DataType.String)]
-    public static string Read()
+    public static object Read()
     {
-        return Console.ReadLine()!;
+        var res = Console.ReadLine()!;
+        return res =="" ? SuperGlobals.SuperGlobalVars["unset"].Invoke() : res!; 
+    }
+
+    public static Token TokenRead()
+    {
+        var res = Console.ReadLine();
+        return res =="" ? new Token(TokenType.Unset,"") : new Token(TokenType.String,res); 
+    }
+}
+
+public class InternalUtils : InternalStandartLibrary
+{
+    [InternalFunc(DataType.Any)]
+    public static V_Variable Evaluate(string expression,DataType requiredType = DataType.Any){
+        return Evaluator.Evaluate(expression,requiredType);
+    }
+}
+
+public class InternalTest : InternalUtils
+{
+    [InternalFunc(DataType.None)]
+    public static void Test(){
+        Console.WriteLine("test");
     }
 }
 
