@@ -107,5 +107,16 @@ public class InternalStandartLibrary
         return V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray(module.Variables));
     }
 
+    [InternalFunc(DataType.None)]
+    public static void ForEach(VArray array,VFunc callback)
+    {
+        foreach (var item in array)
+        {
+            Interpreter.CallFunction(callback,new(){
+                {callback.Args[0].name,item}
+            });
+        }
+    }
+
 
 }

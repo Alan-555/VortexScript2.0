@@ -135,7 +135,7 @@ public class Interpreter
                         Console.Write("｜");
                         Console.Write("\t");
                     }
-                    if (DirectiveDefinition<int>.DIR_BufferMode.value)
+                    if (Directives.DIR_BufferMode.value)
                     {
                         List<string> list = [];
                         while (true)
@@ -1028,21 +1028,20 @@ public class Interpreter
         }
         string directiveName = directive[0];
         string value = directive[1];
-        var thing = DirectiveDefinition<int>.GetDirectiveField("DIR_" + directiveName[0].ToString().ToUpper() + directiveName[1..], out var type);
-        var value_ = Evaluator.Evaluate(value, type);
+        var thing = Directives.GetDirectiveField("DIR_" + directiveName[0].ToString().ToUpper() + directiveName[1..], out var type);
+        var value_ = Evaluator.Evaluate(value, Utils.CSharpTypeToVortexType(type));
         var fieldValue = thing.GetValue(null);
-        var valueField = fieldValue.GetType().GetField("value", BindingFlags.Instance | BindingFlags.Public);
-        if (valueField != null && valueField.FieldType.IsAssignableFrom(value_.value.GetType()))
-        {
-            valueField.SetValue(fieldValue, value_.value);
-        }
-        else
-        {
-            throw new ArgumentException($"Value type mismatch: Expected {valueField.FieldType}, got {value.GetType()}");
+        if(fieldValue != null){
+            var newVal = 
+            thing.SetValue(null, new DirectiveDefinition());
         }
 
 
     }
+
+    public T CastObject<T>(object input) {   
+    return (T) input;   
+}
 
     [MarkStatement("raise ", false)]
     public void ThrowStatement(string statement)

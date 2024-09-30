@@ -3,9 +3,60 @@ using VortexScript.Vortex;
 
 namespace VortexScript.Definitions;
 
+static class Directives{
+    
+    public static DirectiveDefinition<bool> DIR_BufferMode = new(false);
+
+    public static FieldInfo GetDirectiveField(string dirName, out Type type)
+    {
+         type = null;
+
+        // Use reflection to get the current class (or whatever class you're inspecting).
+        // In this example, I'm assuming the static fields are in this class. You can change the target type if needed.
+        Type targetType = typeof(Directives);
+
+        // Retrieve the static public field by its name using reflection
+        FieldInfo fieldInfo = targetType.GetField(dirName, BindingFlags.Public | BindingFlags.Static);
+
+        // If the field is found and it is generic, process further
+        if (fieldInfo != null)
+        {
+            // Get the type of the field
+            Type fieldType = fieldInfo.FieldType;
+
+            // Check if the field type is a generic type
+            if (fieldType.IsGenericType)
+            {
+                // Get the generic arguments of the field's type
+                Type[] genericArguments = fieldType.GetGenericArguments();
+
+                // Assuming it's a generic type with one type argument, set the dataType
+                if (genericArguments.Length == 1)
+                {
+                    type = (genericArguments[0]);  // Get the T type from the generic field
+                }
+                else
+                {
+                    throw new InvalidOperationException("The field has more than one generic argument.");
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException("The field is not of a generic type.");
+            }
+        }
+        else
+        {
+            throw new UnknownNameError($"{dirName[4..]}");
+        }
+
+        return fieldInfo;
+    }
+}
+
+
 class DirectiveDefinition<T>
 {
-    public static DirectiveDefinition<bool> DIR_BufferMode = new(false);
     public DataType dataType;
     public T value;
 
@@ -24,44 +75,6 @@ class DirectiveDefinition<T>
             dataType = DataType.String;
         }
         this.value = value;
-    }
-
-    public static FieldInfo GetDirectiveField(string dirName, out DataType dataType)
-    {
-        // Initialize the out parameter
-        dataType = default;
-
-        // Get the type of DirectiveDefinition<T>
-        var type = typeof(DirectiveDefinition<>);
-
-        // Loop through possible type parameters (bool, double)
-        foreach (var fieldType in new[] { typeof(bool), typeof(double) })
-        {
-            // Get the specific type of DirectiveDefinition<T>
-            var specificType = type.MakeGenericType(fieldType);
-
-            // Get the static field by name
-            var field = specificType.GetField(dirName, BindingFlags.Static | BindingFlags.Public);
-
-            if (field != null)
-            {
-                // Get the value of the static field
-                var directiveInstance = field.GetValue(null);
-
-                // Get the dataType field from the instance
-                var dataTypeField = specificType.GetField("dataType", BindingFlags.Instance | BindingFlags.Public);
-
-                if (dataTypeField != null)
-                {
-                    // Set the out parameter
-                    dataType = (DataType)dataTypeField.GetValue(directiveInstance)!;
-                }
-
-                // Return the FieldInfo
-                return field;
-            }
-        }
-        throw new UnknownNameError($"{dirName}'");
     }
 
 }
