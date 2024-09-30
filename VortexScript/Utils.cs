@@ -367,6 +367,9 @@ class Utils
         if(type == typeof(bool)) return DataType.Bool;
         if(type == typeof(DataType)) return DataType.Type;
         if(type == typeof(VArray)) return DataType.Array;
+        if(type == typeof(VFunc)) return DataType.Function;
+        if(type == typeof(V_Variable)) return DataType.Any;
+        if(type == typeof(VContext)) return DataType.Module;
 
         return DataType.None;
     }

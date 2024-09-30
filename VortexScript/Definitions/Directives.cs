@@ -5,8 +5,8 @@ namespace VortexScript.Definitions;
 
 static class Directives{
     
-    public static DirectiveDefinition<bool> DIR_BufferMode = new(false);
-    public static DirectiveDefinition<bool> DIR_SuppressWarnings = new(false);
+    public static DirectiveDefinition<bool> DIR_bufferMode = new(false);
+    public static DirectiveDefinition<bool> DIR_suppressWarnings = new(false);
 
     public static FieldInfo GetDirectiveField(string dirName, out Type type)
     {

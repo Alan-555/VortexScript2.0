@@ -8,6 +8,7 @@ public class VFile
     string[] bufferedFile = [];
     public VFrame FileFrame { set; get; }
     public VContext? TopLevelContext { set; get; }
+    public string? OverridenName {get;set;}
     public VFile(string path)
     {
         Path = path;
@@ -61,10 +62,12 @@ public class VFile
 
     public string GetFileName()
     {
+        if(OverridenName!=null)return OverridenName;
         return Path.Split(".")[0];
     }
     public string GetFileNameUpper()
     {
+        if(OverridenName!=null)return OverridenName;
         var v = GetFileName();
         return v[0].ToString().ToUpper() + v[1..];
     }

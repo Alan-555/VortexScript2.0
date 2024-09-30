@@ -44,6 +44,15 @@ public class VContext
         Variables.Clear();
     }
 
+    public static void RenameNew(string name)
+    {
+        string toRemove = Interpreter.ActiveModules.Last().Key;
+        Interpreter.ActiveModules.Remove(toRemove, out var context);
+        Interpreter.ActiveModules.Add(name, context!);
+        context.File.OverridenName = name;
+        context.Name = name;
+    }
+
     public override string ToString()
     {
         return Name;

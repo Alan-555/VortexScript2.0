@@ -102,8 +102,10 @@ public class Interpreter
             }
 
             InternalModules.Add(type.Name[8..], new(constants, null, scopeType: ScopeTypeEnum.internal_) { Name = type.Name[8..] });
+            keywords = keywords.Append(type.Name[8..]).ToArray();
             first = false;
         }
+        
         //add types
         var types = Enum.GetNames(typeof(DataType)).ToList();
         foreach (var type in types)
@@ -135,7 +137,7 @@ public class Interpreter
                         Console.Write("｜");
                         Console.Write("\t");
                     }
-                    if (Directives.DIR_BufferMode.value)
+                    if (Directives.DIR_bufferMode.value)
                     {
                         List<string> list = [];
                         while (true)
@@ -177,8 +179,13 @@ public class Interpreter
                     GetCurrentContext().Ignore = true;
                     GetCurrentContext().SubsequentFramesIgnore = true;
                 }
-                else
-                    VortexError.ThrowError(e);
+                else{
+                    VortexError.ThrowError(e);//TODO: fix itm error handeling
+                    if(itm&&GetCurrentFrame()!=CallStack.First()){
+                        CallStack.Pop();
+                        return null;
+                    }
+                }
             }
             catch (Exception)
             {
@@ -1020,6 +1027,18 @@ public class Interpreter
         var directive = statement[1..].Split(' ');
         if (directive.Length < 2)
         {
+            if(directive[0][0]=='#'){
+                if(GetCurrentFrame().currentLine==0){
+                    var name = directive[0][1..];
+                    name = name[0].ToString().ToUpper()+name[1..];
+                    if(!Utils.IsIdentifierValid(name,true)){
+                        throw new InvalidIdentifierError(name);
+                    }
+                    VContext.RenameNew(name);
+                    return;
+                }
+                else throw new IlegalStatementContextError("Module name statements have to be on the first line");
+            }
             throw new ExpectedTokenError("directive and value");
         }
         else if (directive.Length > 2)
@@ -1028,7 +1047,7 @@ public class Interpreter
         }
         string directiveName = directive[0];
         string value = directive[1];
-        var thing = Directives.GetDirectiveField("DIR_" + directiveName[0].ToString().ToUpper() + directiveName[1..], out var type);
+        var thing = Directives.GetDirectiveField("DIR_" +directiveName, out var type);
         var value_ = Evaluator.Evaluate(value, Utils.CSharpTypeToVortexType(type));
         var fieldValue = thing.GetValue(null);
         if(fieldValue != null){

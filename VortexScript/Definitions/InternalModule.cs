@@ -25,7 +25,7 @@ public class InternalStandartLibrary
         return V_Variable.Construct(DataType.Type, var);
     }
     [InternalFunc(DataType.Any)]
-    public static V_Variable New(DataType type, string var)
+    public static V_Variable New(DataType type, string var) //TODO: fix string param
     {
         try
         {
@@ -84,7 +84,7 @@ public class InternalStandartLibrary
         return New(DataType.Error, message);
     }
     [InternalFunc(DataType.Array)]
-    public static V_Variable Unpack(V_Variable first_, V_Variable second_)
+    public static V_Variable Unpack(V_Variable first_, V_Variable second_)//TODO: enforce types
     {
         var first = (VArray)first_.value; var second = (VArray)second_.value;
         V_Variable[] newArr= new V_Variable[first.Count];

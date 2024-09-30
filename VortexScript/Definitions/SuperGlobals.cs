@@ -15,7 +15,7 @@ public static class SuperGlobals
         {"this",()=>V_Variable.Construct(DataType.Module,Interpreter.GetCurrentFrame().VFile.GetFileNameUpper())},
         {"main",()=>V_Variable.Construct(DataType.Module,Interpreter.CallStack.First().ScopeStack.First())},
         {"_frame",()=>V_Variable.Construct(DataType.String,Interpreter.GetCurrentFrame().Name)},
-        {"_depth",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentContext().Depth)},
+        {"_depth",()=>V_Variable.Construct(DataType.Number,(double)Interpreter.GetCurrentContext().Depth)},
         {"_line",()=>V_Variable.Construct(DataType.Number,Interpreter.GetCurrentFrame().currentLine)},
         {"first",()=>V_Variable.Construct(DataType.Indexer,"0")},
         {"last",()=>V_Variable.Construct(DataType.Indexer,"-1")},
