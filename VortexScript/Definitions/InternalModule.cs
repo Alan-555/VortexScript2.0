@@ -117,6 +117,12 @@ public class InternalStandartLibrary
             });
         }
     }
-
+    [InternalFunc(DataType.Array)]
+    public static V_Variable Dir(string str)
+    {
+       var dir = Directives.GetDirectiveField("DIR_" + str, out var type);
+       dynamic val = dir.GetValue(null)!;
+       return V_Variable.Construct(DataType.Array,new VArray(val.value,Utils.CSharpTypeToVortexType(type)));
+    }
 
 }

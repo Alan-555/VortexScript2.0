@@ -6,6 +6,7 @@ namespace VortexScript.Definitions;
 static class Directives{
     
     public static DirectiveDefinition<bool> DIR_BufferMode = new(false);
+    public static DirectiveDefinition<bool> DIR_SupressWarnings = new(false);
 
     public static FieldInfo GetDirectiveField(string dirName, out Type type)
     {
@@ -62,6 +63,14 @@ class DirectiveDefinition<T>
 
     public DirectiveDefinition(T value)
     {
+        Construct(value);
+    }
+    public DirectiveDefinition(object val)
+    {
+        Construct((T)val);
+    }
+
+    private void Construct(T value){
         if (typeof(T) == typeof(bool))
         {
             dataType = DataType.Bool;
@@ -76,5 +85,4 @@ class DirectiveDefinition<T>
         }
         this.value = value;
     }
-
 }

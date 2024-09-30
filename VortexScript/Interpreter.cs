@@ -1032,8 +1032,9 @@ public class Interpreter
         var value_ = Evaluator.Evaluate(value, Utils.CSharpTypeToVortexType(type));
         var fieldValue = thing.GetValue(null);
         if(fieldValue != null){
-            var newVal = 
-            thing.SetValue(null, new DirectiveDefinition());
+            var constructedType = typeof(DirectiveDefinition<>).MakeGenericType(type);
+            object newVal = Activator.CreateInstance(constructedType,value_.value)!;
+            thing.SetValue(null, newVal);
         }
 
 

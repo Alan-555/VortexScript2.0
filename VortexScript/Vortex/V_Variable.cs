@@ -287,6 +287,12 @@ public class VArray : List<V_Variable>
         ret = ret[..^1] + "]";
         return ret;
     }
+    public VArray(){}
+    public VArray(params dynamic[] vals){
+        foreach(var val in vals){
+            this.Add(V_Variable.Construct(Utils.CSharpTypeToVortexType(val.GetType()), val));
+        }
+    }
 }
 
 

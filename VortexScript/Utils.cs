@@ -365,6 +365,7 @@ class Utils
         if(type == typeof(double)) return DataType.Number;
         if(type == typeof(string)) return DataType.String;
         if(type == typeof(bool)) return DataType.Bool;
+        if(type == typeof(DataType)) return DataType.Type;
         if(type == typeof(VArray)) return DataType.Array;
 
         return DataType.None;
