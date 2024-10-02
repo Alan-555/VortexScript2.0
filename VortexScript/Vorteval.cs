@@ -20,7 +20,7 @@ public class Evaluator
         Evaluator ev = new();
         var w = Utils.StartWatch();
         var result = ev.Evaluate(expression);
-        Utils.StopWatch(w, "Expression " + expression);
+        Utils.StopWatch(w, "Expression " + expression); 
         if (requiredType != DataType.None && requiredType != DataType.Any)
         {
             if (result.type != requiredType)
@@ -60,7 +60,6 @@ public class Evaluator
 
     public Evaluator()
     {
-        
         Init();
     }
 
@@ -141,17 +140,23 @@ public class Evaluator
         {
             if (i != tokens.Count - 1 && tokens[i + 1].type == TokenType.Indexer)
             {
-                V_Variable index;
-                try{
-                    index = InternalStandartLibrary.Indexer(int.Parse(tokens[i + 1].value));
+                IndexerRange index;
+                string expr = tokens[i + 1].value;
+                var res = Evaluator.Evaluate(expr);
+                if(res.value is double){
+                    index = new(Convert.ToInt32(res.value));
                 }
-                catch{
-                    throw new InvalidFormatError(tokens[i + 1].value,"Number");
+                else if(res.value is IndexerRange range)
+                {
+                    index = range;
+                }
+                else{
+                    throw new InvalidFormatError(res.ToString(),"number | range");
                 }
                 var variable = tokens[i].GetValVar();
                 try
                 {
-                    variable = variable.Index(Convert.ToInt32(index.value));
+                    variable = variable.Index(index);
                 }
                 catch (OverflowException)
                 {
@@ -181,6 +186,8 @@ public class Evaluator
         {
             throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens, true) + ") apeared after proccessing. Are you missing an operator or an operand?");
         }
+        if(tokens[0].type==TokenType.Operator)
+            throw new ExpressionEvalError(this,"Operator cannot be a result of an expression. Are you missing operands?");
         var dataType = TokenTypeToDataType(tokens[0].type);
         if (tokens[0].actualValue != null)
             return V_Variable.Construct(dataType, tokens[0].actualValue!);
@@ -681,6 +688,7 @@ public class Operators
            .Where(m => m.GetCustomAttributes(typeof(OperatorDefinition), false).Length > 0)
            .ToDictionary(m => m.GetCustomAttribute<OperatorDefinition>(), m => m));
     }
+    //TODO: find findind. WHen not find, it says "wrong prcedence" and never says "unknown operator"
     public static object? RunOperation(Token? left, Token? right, string syntax, int currentPrecedence, Evaluator eval, out DataType returnType, out int unaryN)
     {
         
@@ -853,6 +861,12 @@ public class Operators
     public static DataType TypeOfOperator(Token right)
     {
         return right.GetValVar().type;
+    }
+
+    [OperatorDefinition(TokenType.Number, TokenType.Number, "->", 1, DataType.Indexer)]
+    public static IndexerRange InexerRange(Token left, Token right)
+    {
+        return new IndexerRange(Convert.ToInt32((double)left.GetVal()), Convert.ToInt32((double)right.GetVal()));
     }
 
     //mult

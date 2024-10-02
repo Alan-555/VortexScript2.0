@@ -13,3 +13,5 @@ cool GC
 
 
 # bugs
+
+x ([0]) - weird stuff

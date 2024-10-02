@@ -67,7 +67,7 @@ public abstract class V_Variable
 
     public abstract object ConvertToCSharpType(string v);
     public abstract override string ToString();
-    public virtual V_Variable Index(int index)
+    public virtual V_Variable Index(IndexerRange index)
     {
         throw new IlegalOperationError($"The type '{type}' is not indexable");
     }
@@ -180,15 +180,14 @@ public class VType_String : V_Variable
     {
         return value.ToString()!;
     }
-    public override V_Variable Index(int index)
+    public override V_Variable Index(IndexerRange index)
     {
-        if (index < 0)
-            index = ((string)value).Length + index;
         try
         {
-            return Construct(type, ((string)value)[index], new() { readonly_ = true });
+            index = index.UseLength(((string)value).Length);
+            return Construct(type, value.ToString()![index.start..index.end], new() { readonly_ = true });
         }
-        catch (IndexOutOfRangeException)
+        catch (FormatException)
         {
             throw new IndexOutOfBoundsError(index.ToString());
         }
@@ -233,16 +232,21 @@ public class VType_Array : V_Variable
         ret = ret[..^1] + "]";
         return ret;
     }
-    public override V_Variable Index(int index)
+    public override V_Variable Index(IndexerRange index)
     {
-        if (index < 0)
-            index = ((VArray)value).Count + index;
         var arr = (VArray)value;
         try
         {
-            return arr[index];
+            index = index.UseLength(arr.Count);
+            if (index.IsRange)
+            {
+                return Construct(DataType.Array, new VArray(arr[index.start..index.end].ToList()));
+            }
+            else{
+                return arr[index.start];
+            }
         }
-        catch (ArgumentOutOfRangeException)
+        catch (ArgumentException)
         {
             throw new IndexOutOfBoundsError(index.ToString());
         }
@@ -254,18 +258,21 @@ public class VType_Array : V_Variable
     }
     public override V_Variable SpecialSub(V_Variable second)
     {
-        if(second.type==DataType.Indexer){
+        if (second.type == DataType.Indexer)
+        {
             int i = Convert.ToInt32(second.value);
-            try{
-                if(i<0) i = ((VArray)value).Count+i;
+            try
+            {
+                if (i < 0) i = ((VArray)value).Count + i;
                 ((VArray)value).RemoveAt(i);
                 return this;
             }
-            catch(IndexOutOfRangeException){
-                throw new IndexOutOfBoundsError(i+"");
+            catch (IndexOutOfRangeException)
+            {
+                throw new IndexOutOfBoundsError(i + "");
             }
         }
-        ((VArray)value).RemoveAll(x=>x.value.Equals(second.value));
+        ((VArray)value).RemoveAll(x => x.value.Equals(second.value));
         return this;
     }
     public override V_Variable SpecialClear(object dummy)
@@ -287,9 +294,15 @@ public class VArray : List<V_Variable>
         ret = ret[..^1] + "]";
         return ret;
     }
-    public VArray(){}
-    public VArray(params dynamic[] vals){
-        foreach(var val in vals){
+    public VArray() { }
+
+    public VArray(List<V_Variable> l) {
+        AddRange(l);
+    }
+    public VArray(params dynamic[] vals)
+    {
+        foreach (var val in vals)
+        {
             this.Add(V_Variable.Construct(Utils.CSharpTypeToVortexType(val.GetType()), val));
         }
     }
@@ -382,16 +395,45 @@ public class VType_Type : V_Variable
 }
 public class VType_Indexer : V_Variable
 {
+
     public VType_Indexer(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
     public override object ConvertToCSharpType(string v)
     {
-        return double.Parse(v, CultureInfo.InvariantCulture);
+        return new IndexerRange();
     }
 
     public override string ToString()
     {
         return value.ToString()!;
     }
+}
+public struct IndexerRange(int start, int? end = null)
+{
+    public int start = start, end = end ?? start+1;
+    public IndexerRange UseLength(int len)
+    {
+        var start_ = start;
+        var end_ = end;
+        if (start<0){
+            start_ = len + start;
+            if(!IsRange)
+                end_ = start_+1;
+                
+        }
+        if (end < 0)
+            end_ = len + end;
+        if(end_<start_){
+            throw new ArgumentError("The start value has to be smaller or equal to the end value");
+        }
+        return new(start_, end_);
+    }
+    public override string ToString()
+    {
+        if(IsRange)
+            return start+"->"+end;
+        return start+"";
+    }
+    public readonly bool IsRange { private set { } get => start+1 != end; }
 }
 
 public class VType_Error : V_Variable

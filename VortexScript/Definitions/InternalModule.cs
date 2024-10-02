@@ -37,14 +37,16 @@ public class InternalStandartLibrary
         }
     }
     [InternalFunc(DataType.Indexer)]
-    public static V_Variable Indexer(int val)
+    public static V_Variable Indexer(double number)
     {
-        return V_Variable.Construct(DataType.Indexer, val);
+        IndexerRange index;
+        index = new(Convert.ToInt32(number));
+        return V_Variable.Construct(DataType.Indexer, index);
     }
-    [InternalFunc(DataType.Indexer,true)]
-    public static V_Variable I(int val)
+    [InternalFunc(DataType.Indexer, true)]
+    public static V_Variable I(double number)
     {
-        return V_Variable.Construct(DataType.Indexer, val);
+        return Indexer(number);
     }
     [InternalFunc(DataType.None)]
     public static V_Variable ThrowError(V_Variable v, string message)
@@ -87,32 +89,32 @@ public class InternalStandartLibrary
     public static V_Variable Unpack(V_Variable first_, V_Variable second_)//TODO: enforce types
     {
         var first = (VArray)first_.value; var second = (VArray)second_.value;
-        V_Variable[] newArr= new V_Variable[first.Count];
+        V_Variable[] newArr = new V_Variable[first.Count];
         first.CopyTo(newArr);
-        VArray newArray =[.. newArr, .. second];
-        return V_Variable.Construct(DataType.Array,newArray);
+        VArray newArray = [.. newArr, .. second];
+        return V_Variable.Construct(DataType.Array, newArray);
     }
 
     [InternalFunc(DataType.String)]
     public static V_Variable FileName(VContext module)
     {
-        if(module.File == null)
-            return V_Variable.Construct(DataType.String,"<internal>");
-        return V_Variable.Construct(DataType.String,module.File!.Path);
+        if (module.File == null)
+            return V_Variable.Construct(DataType.String, "<internal>");
+        return V_Variable.Construct(DataType.String, module.File!.Path);
     }
 
     [InternalFunc(DataType.Array)]
     public static V_Variable GetVars(VContext module)
     {
-        return V_Variable.Construct(DataType.Array,Utils.ConvertDictToVArray(module.Variables));
+        return V_Variable.Construct(DataType.Array, Utils.ConvertDictToVArray(module.Variables));
     }
 
     [InternalFunc(DataType.None)]
-    public static void ForEach(VArray array,VFunc callback)
+    public static void ForEach(VArray array, VFunc callback)
     {
         foreach (var item in array)
         {
-            Interpreter.CallFunction(callback,new(){
+            Interpreter.CallFunction(callback, new(){
                 {callback.Args[0].name,item}
             });
         }
@@ -120,9 +122,9 @@ public class InternalStandartLibrary
     [InternalFunc(DataType.Array)]
     public static V_Variable Dir(string str)
     {
-       var dir = Directives.GetDirectiveField("DIR_" + str, out var type);
-       dynamic val = dir.GetValue(null)!;
-       return V_Variable.Construct(DataType.Array,new VArray(val.value,Utils.CSharpTypeToVortexType(type)));
+        var dir = Directives.GetDirectiveField("DIR_" + str, out var type);
+        dynamic val = dir.GetValue(null)!;
+        return V_Variable.Construct(DataType.Array, new VArray(val.value, Utils.CSharpTypeToVortexType(type)));
     }
 
 }
