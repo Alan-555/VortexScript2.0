@@ -90,7 +90,7 @@ public class Interpreter
             });
             foreach (var item in method)
             {
-                constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value,new(){readonly_=true}));
+                constants.Add(item.Key, V_Variable.Construct(DataType.Function, item.Value, new() { readonly_ = true }));
             }
             if (first)
             {
@@ -105,7 +105,7 @@ public class Interpreter
             keywords = keywords.Append(type.Name[8..]).ToArray();
             first = false;
         }
-        
+
         //add types
         var types = Enum.GetNames(typeof(DataType)).ToList();
         foreach (var type in types)
@@ -179,9 +179,11 @@ public class Interpreter
                     GetCurrentContext().Ignore = true;
                     GetCurrentContext().SubsequentFramesIgnore = true;
                 }
-                else{
+                else
+                {
                     VortexError.ThrowError(e);//TODO: fix itm error handeling
-                    if(itm&&GetCurrentFrame()!=CallStack.First()){
+                    if (itm && GetCurrentFrame() != CallStack.First())
+                    {
                         CallStack.Pop();
                         return null;
                     }
@@ -506,11 +508,7 @@ public class Interpreter
             {
                 if (statement[i] == '.')
                 {
-                    if (!ReadVar(identifier, out var val, type: DataType.Module))
-                    {
-                        throw new UnknownNameError(identifier);
-                    }
-                    module = (VContext)val!.value;
+                    module = (VContext)Evaluator.Evaluate(identifier, DataType.Module).value;
                     identifier = "";
                     i++;
                     continue;
@@ -549,7 +547,7 @@ public class Interpreter
                     spec.Invoke(var, [Evaluator.Evaluate(expression)]);
                     return true;
                 }
-                SetVar(identifier,Evaluator.Evaluate(expression),module);
+                SetVar(identifier, Evaluator.Evaluate(expression), module);
                 return true;
             }
         }
@@ -675,10 +673,7 @@ public class Interpreter
             }
             if (module != "")
             {
-                if (!TryGetModule(module, out context))
-                {
-                    throw new UnknownNameError(module);
-                }
+                context = (VContext)Evaluator.Evaluate(module, DataType.Module).value;
             }
             if (!ReadVar(identifier, out var func_, context, type: DataType.Function))
             {
@@ -1027,11 +1022,14 @@ public class Interpreter
         var directive = statement[1..].Split(' ');
         if (directive.Length < 2)
         {
-            if(directive[0][0]=='#'){
-                if(GetCurrentFrame().currentLine==0){
+            if (directive[0][0] == '#')
+            {
+                if (GetCurrentFrame().currentLine == 0)
+                {
                     var name = directive[0][1..];
-                    name = name[0].ToString().ToUpper()+name[1..];
-                    if(!Utils.IsIdentifierValid(name,true)){
+                    name = name[0].ToString().ToUpper() + name[1..];
+                    if (!Utils.IsIdentifierValid(name, true))
+                    {
                         throw new InvalidIdentifierError(name);
                     }
                     VContext.RenameNew(name);
@@ -1047,21 +1045,23 @@ public class Interpreter
         }
         string directiveName = directive[0];
         string value = directive[1];
-        var thing = Directives.GetDirectiveField("DIR_" +directiveName, out var type);
+        var thing = Directives.GetDirectiveField("DIR_" + directiveName, out var type);
         var value_ = Evaluator.Evaluate(value, Utils.CSharpTypeToVortexType(type));
         var fieldValue = thing.GetValue(null);
-        if(fieldValue != null){
+        if (fieldValue != null)
+        {
             var constructedType = typeof(DirectiveDefinition<>).MakeGenericType(type);
-            object newVal = Activator.CreateInstance(constructedType,value_.value)!;
+            object newVal = Activator.CreateInstance(constructedType, value_.value)!;
             thing.SetValue(null, newVal);
         }
 
 
     }
 
-    public T CastObject<T>(object input) {   
-    return (T) input;   
-}
+    public T CastObject<T>(object input)
+    {
+        return (T)input;
+    }
 
     [MarkStatement("raise ", false)]
     public void ThrowStatement(string statement)
@@ -1201,7 +1201,7 @@ public class Interpreter
         if (!val!.flags.unsetable && val.type == DataType.Unset)
             throw new ReadingUnsetValueError(identifier);
         if (type != DataType.Any && val.type != type)
-            throw new UnmatchingDataTypeError(identifier+"("+val.type.ToString()+")", type.ToString());
+            throw new UnmatchingDataTypeError(identifier + "(" + val.type.ToString() + ")", type.ToString());
         return res;
     }
     public static bool TryGetSuperGlobal(string identifier, out V_Variable? val, DataType type = DataType.Any)
@@ -1220,12 +1220,31 @@ public class Interpreter
     {
         return ActiveModules.TryGetValue(name, out module) || InternalModules.TryGetValue(name, out module);
     }
+    
     public bool SetVar(string identifier, V_Variable value, VContext? scope = null)
     {
+        if (scope == null)
+        {
+            var frame = GetCurrentFrame();
+            foreach (var item in frame.ScopeStack)
+            {
+                if (item.Variables.ContainsKey(identifier))
+                {
+                    var prevFlags = item.Variables[identifier].flags;
+                    item.Variables[identifier] = value;
+                    item.Variables[identifier].flags = prevFlags;
+                    return true;
+                }
+            }
+            return false;
+        }
         scope ??= GetCurrentContext();
+
         if (scope.Variables.ContainsKey(identifier))
         {
+            var prevFlags = scope.Variables[identifier].flags;
             scope.Variables[identifier] = value;
+            scope.Variables[identifier].flags = prevFlags;
             return true;
         }
         return false;

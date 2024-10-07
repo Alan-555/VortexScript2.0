@@ -295,6 +295,9 @@ class Utils
                 vars.TryAdd(kv.Key, kv.Value);
             }
         }
+        foreach(var (k,v) in Interpreter.GetCurrentFrame().VFile.TopLevelContext!.Variables){
+            vars.TryAdd(k,v);
+        }
         return vars;
     }
 
