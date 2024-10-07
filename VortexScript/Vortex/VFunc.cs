@@ -14,6 +14,7 @@ public class VFunc
     public MethodInfo? CSharpFunc { get; set; } = null;
     public bool ForceUppercase { get; set; } = false;
     public DataType returnType { get; set; } = DataType.Any;
+    public bool IsConstructor {get;set;} = false;
 
     public VFunc(string indetifier, VFile file, VFuncArg[] args, int startLine)
     {

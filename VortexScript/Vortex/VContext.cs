@@ -69,5 +69,6 @@ public enum ScopeTypeEnum
     tryScope = 5, //try scope of a try-catch statement
     catchScope = 6, //catch scope of a try-catch statement
     loopScope = 7,
+    classScope = 8,
     internal_ = -1,
 }

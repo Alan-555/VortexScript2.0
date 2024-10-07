@@ -479,6 +479,10 @@ public class Interpreter
     {
         return CallStack.First();
     }
+    public static VContext GetCurrentTopLevelContext()
+    {
+        return CallStack.First().VFile.TopLevelContext!;
+    }
     public static VContext GetCurrentContext()
     {
         if (!GetCurrentFrame().ScopeStack.TryPeek(out _))
@@ -558,7 +562,7 @@ public class Interpreter
 
         if (Utils.StringContains(statement, "(") && Utils.StringContains(statement, ")") && statement.EndsWith(" :"))
         {
-            if (GetCurrentContext().FuncBeingRead != null || GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel)
+            if (GetCurrentContext().FuncBeingRead != null || GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel && GetCurrentContext().ScopeType != ScopeTypeEnum.classScope)
             {
                 throw new IlegalContextDeclarationError("function").SetInfo("Functions may only be declared at the top level");
             }
@@ -616,6 +620,15 @@ public class Interpreter
                 }
             }
             VFunc func = new(identifier, File, [.. argsList], GetCurrentFrame().currentLine);
+            if (GetCurrentContext().ScopeType == ScopeTypeEnum.classScope)
+            {
+                if (GetCurrentContext().Name == identifier)
+                { //constructor
+                    GetCurrentTopLevelContext().Variables.Remove(identifier);
+                    func.IsConstructor = true;
+
+                }
+            }
             var c = OpenNewContext(ScopeTypeEnum.functionScope);
             c.Ignore = true;
             c.SubsequentFramesIgnore = true;
@@ -1113,6 +1126,14 @@ public class Interpreter
         }
     }
 
+    [MarkStatement("class ", true, ScopeTypeEnum.classScope)]
+    public void ClassStatement(string statement)
+    {
+        var identifier = "Car"; //TODO: lexer
+
+
+    }
+
     [MarkStatement("while ", true, ScopeTypeEnum.loopScope)]
     public void WhileStatement(string statement)
     {
@@ -1220,7 +1241,7 @@ public class Interpreter
     {
         return ActiveModules.TryGetValue(name, out module) || InternalModules.TryGetValue(name, out module);
     }
-    
+
     public bool SetVar(string identifier, V_Variable value, VContext? scope = null)
     {
         if (scope == null)

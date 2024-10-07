@@ -1,11 +1,9 @@
-##Stuff
-fib(a) :
-    if a<1 :
-        < 1
-    ;
-    < fib(a-1)+fib(a-2)
-;
+class Car :
+    $color = "Red"
+    $hp = 70
+    Car(color,hp) :
+        this.color = color
+        this.hp = hp
 
-in() :
-    < StdInOut.read()
-;
+    crash() :
+        hp-=40 
