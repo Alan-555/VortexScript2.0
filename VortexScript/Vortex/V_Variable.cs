@@ -308,6 +308,23 @@ public class VArray : List<V_Variable>
     }
 }
 
+public class VType_Class : V_Variable
+{
+    public VClass GetClass(){
+        return (VClass)this.value;
+    }
+    public VType_Class(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+
+    public override object ConvertToCSharpType(string v)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override string ToString()
+    {
+        return GetClass().Identifier;
+    }
+}
 
 
 public class VType_Unset : V_Variable
@@ -504,4 +521,5 @@ public enum DataType
     GroupType = 11,
     Function = 12,
     None = 13,
+    Class = 14
 }

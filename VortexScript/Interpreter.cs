@@ -417,6 +417,16 @@ public class Interpreter
                         GetCurrentFrame().currentLine = context.StartLine - 1;
                     }
                 }
+                if(context.ScopeType == ScopeTypeEnum.classScope){
+                    var class_ = new VClass(context.Name,context.File!);
+                    if(!Utils.IsIdentifierValid(class_.Identifier)){
+                        throw new InvalidIdentifierError(class_.Identifier);
+                    }
+                    var var = V_Variable.Construct(DataType.Type,class_);
+                    if(!DeclareVar(class_.Identifier,var)){
+                        throw new IdentifierAlreadyUsedError(class_.Identifier);
+                    }
+                }
             }
             else
             if (startsScope)
@@ -1130,8 +1140,9 @@ public class Interpreter
     public void ClassStatement(string statement)
     {
         var identifier = "Car"; //TODO: lexer
-
-
+        GetCurrentContext().Ignore = true;
+        GetCurrentContext().SubsequentFramesIgnore = true;
+        GetCurrentContext().Name= identifier;
     }
 
     [MarkStatement("while ", true, ScopeTypeEnum.loopScope)]
