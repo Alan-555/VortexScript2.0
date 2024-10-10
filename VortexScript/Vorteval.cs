@@ -20,7 +20,7 @@ public class Evaluator
         Evaluator ev = new();
         var w = Utils.StartWatch();
         var result = ev.Evaluate(expression);
-        Utils.StopWatch(w, "Expression " + expression); 
+        Utils.StopWatch(w, "Expression " + expression);
         if (requiredType != DataType.None && requiredType != DataType.Any)
         {
             if (result.type != requiredType)
@@ -136,7 +136,7 @@ public class Evaluator
         }
         //proccess variables
         tokens = ProccessVariables(tokens);
-        tokens.RemoveAll(x => x.type == TokenType.Ignore);
+        tokens.RemoveAll(x => x.type == TokenType.Ignore);//TODO: use the new dot notation. Same with indexers
         for (int i = 0; i < tokens.Count; i++)
         {
             if (i != tokens.Count - 1 && tokens[i + 1].type == TokenType.Indexer)
@@ -144,15 +144,17 @@ public class Evaluator
                 IndexerRange index;
                 string expr = tokens[i + 1].value;
                 var res = Evaluator.Evaluate(expr);
-                if(res.value is double){
+                if (res.value is double)
+                {
                     index = new(Convert.ToInt32(res.value));
                 }
-                else if(res.value is IndexerRange range)
+                else if (res.value is IndexerRange range)
                 {
                     index = range;
                 }
-                else{
-                    throw new InvalidFormatError(res.ToString(),"number | range");
+                else
+                {
+                    throw new InvalidFormatError(res.ToString(), "number | range");
                 }
                 var variable = tokens[i].GetValVar();
                 try
@@ -187,8 +189,8 @@ public class Evaluator
         {
             throw new ExpressionEvalError(this, "Too many tokens (" + TokensToExpression(tokens, true) + ") apeared after proccessing. Are you missing an operator or an operand?");
         }
-        if(tokens[0].type==TokenType.Operator)
-            throw new ExpressionEvalError(this,"Operator cannot be a result of an expression. Are you missing operands?");
+        if (tokens[0].type == TokenType.Operator)
+            throw new ExpressionEvalError(this, "Operator cannot be a result of an expression. Are you missing operands?");
         var dataType = TokenTypeToDataType(tokens[0].type);
         if (tokens[0].actualValue != null)
             return V_Variable.Construct(dataType, tokens[0].actualValue!);
@@ -204,6 +206,7 @@ public class Evaluator
         {
             if (tokens[i].type == TokenType.Variable)
             {
+                //if module is true do not read var
                 if (module != null && tokens[i].value == "this")
                     throw new IlegalOperationError("'this' can only be accessed via top-level context.");
                 bool good = Interpreter.ReadVar(tokens[i].value, out var variable, module);
@@ -225,7 +228,7 @@ public class Evaluator
                 if (Interpreter.itm)
                     Console.Write("% ");
                 tokens[i] = InternalStdInOut.TokenRead();
-                
+
 
             }
             else if (tokens[i].type == TokenType.Function)
@@ -243,33 +246,13 @@ public class Evaluator
                 }
                 module = null;
             }
-            else if (tokens[i].type == TokenType.Module)
+            else if (tokens[i].type == TokenType.Module && tokens[i].isDot)
             {
-                if (tokens[i].value == "this")
-                {
-                    module = Interpreter.GetCurrentFrame().VFile.TopLevelContext;
-                    continue;
-                }
 
-                try
-                {
-                    if (Interpreter.ReadVar(tokens[i].value, out var mod_, module, type: DataType.Module))
-                    {
-                        if (module != null)
-                            tokens[i - 1] = new(TokenType.Ignore, "");
-                        module = mod_!.value as VContext;
-                        continue;
-                    }
-                }
-                catch (UnmatchingDataTypeError) { }
-                if (Interpreter.TryGetModule(tokens[i].value, out module))
-                {
-                    moduleName = tokens[i].value;
-                }
-                else
-                {
-                    throw new UnknownNameError(tokens[i].value);
-                }
+                var dotable = Evaluator.Evaluate(tokens[i].value);
+                var other = dotable.GetField(tokens[i + 1].value);
+                tokens[i] = new(TokenType.Ignore, "");
+                tokens[i + 1] = new(DataTypeToTokenType(other.type), other.ToString(), other.value);
 
             }
             else if (tokens[i].type == TokenType.Array)
@@ -411,13 +394,13 @@ public class Evaluator
                 }
                 continue;
             }
-            else if (c == '%'&&!readingVar)
+            else if (c == '%' && !readingVar)
             {
                 tokens.Add(new(TokenType.Console_in, ""));
             }
             else if (readingVar && c == '.')
             {
-                tokens.Add(new(TokenType.Module, currentToken.ToString()){isDot=true});
+                tokens.Add(new(TokenType.Module, currentToken.ToString()) { isDot = true });
 
                 currentToken.Clear();
                 readingVar = false;
@@ -425,12 +408,12 @@ public class Evaluator
             }
 
             else if ((readingVar || !char.IsDigit(c)) //if reading a variable or if it's not a number
-                    &&identifierValidChars.Contains(c) //if the current character is a valid identifier character
-                    &&operatorTest=="" //if not reading an operator
-                    &&(readingVar //if reading a variable
-                    ||forceVar //or it is forced
-                    ||tokens.Count==0 //or if it is the first token
-                    ||CanVarFollow(tokens[^1]) //or if the previous token can follow a variable
+                    && identifierValidChars.Contains(c) //if the current character is a valid identifier character
+                    && operatorTest == "" //if not reading an operator
+                    && (readingVar //if reading a variable
+                    || forceVar //or it is forced
+                    || tokens.Count == 0 //or if it is the first token
+                    || CanVarFollow(tokens[^1]) //or if the previous token can follow a variable
                     ))
             {
                 forceVar = false;
@@ -443,8 +426,9 @@ public class Evaluator
             {
                 currentToken.Append(c);
             }
-            else if(c=='∞'){
-                tokens.Add(new(TokenType.Number,"∞",double.PositiveInfinity));
+            else if (c == '∞')
+            {
+                tokens.Add(new(TokenType.Number, "∞", double.PositiveInfinity));
                 continue;
             }
             else
@@ -471,7 +455,7 @@ public class Evaluator
                     else
                     if (readingVar)
                     {
-                        if(Operators.Operators_.Any(x=>x.Key.syntax==currentToken.ToString()))
+                        if (Operators.Operators_.Any(x => x.Key.syntax == currentToken.ToString()))
                             tokens.Add(new Token(TokenType.Operator, currentToken.ToString()));
                         else
                             tokens.Add(new Token(TokenType.Variable, currentToken.ToString()));
@@ -581,7 +565,7 @@ public class Evaluator
         {
             throw new ExpressionEvalError(this, "Unknown operator " + operatorTest);
         }
-        if(inString)
+        if (inString)
             throw new ExpectedTokenError("\"");
         if (currentToken.Length > 0)
         {
@@ -634,10 +618,11 @@ public class Evaluator
         return scopes;
     }
 
-    public static bool CanVarFollow(Token prevToken){
-        return  prevToken.type == TokenType.Operator
-        ||(prevToken.type==TokenType.Scope&&prevToken.value=="(")
-        ||(prevToken.type==TokenType.Module&&prevToken.isDot);
+    public static bool CanVarFollow(Token prevToken)
+    {
+        return prevToken.type == TokenType.Operator
+        || (prevToken.type == TokenType.Scope && prevToken.value == "(")
+        || (prevToken.type == TokenType.Module && prevToken.isDot);
     }
 
 }
@@ -692,7 +677,7 @@ public class Operators
     //TODO: find findind. WHen not find, it says "wrong prcedence" and never says "unknown operator"
     public static object? RunOperation(Token? left, Token? right, string syntax, int currentPrecedence, Evaluator eval, out DataType returnType, out int unaryN)
     {
-        
+
         string? element = Evaluator.UnaryOperators.FirstOrDefault(x => x[1..] == syntax);
         bool unary = false;
         unaryN = 0;
@@ -749,7 +734,7 @@ public class Operators
                     right_ = TokenType.Any;
                 }
                 def = new(left_, right_, syntax, currentPrecedence);
-                if (!Operators_.TryGetValue(def, out oper, out precedenceCorrect)&&precedenceCorrect)
+                if (!Operators_.TryGetValue(def, out oper, out precedenceCorrect) && precedenceCorrect)
                     throw new ExpressionEvalError(eval, "Unknown operator: " + (oldTypeRight == TokenType.None ? "" : oldTypeRight.ToString()) + syntax + (oldTypeLeft == TokenType.None ? "" : oldTypeLeft.ToString()));
             }
             else
@@ -764,7 +749,7 @@ public class Operators
             returnType = DataType.None;
             return null;
         }
-        InterpreterWarnings.CheckOperator(left_,def,right_);
+        InterpreterWarnings.CheckOperator(left_, def, right_);
         if (unary && oper.GetParameters().Length != 1)
         {
             throw new ExpressionEvalError(eval, "An unary operator takes only one operand: " + syntax);
@@ -792,8 +777,8 @@ public class Operators
         else
         {
             //binary
-            if(!left.HasValue||!right.HasValue)
-                throw new ExpressionEvalError(eval, "A binary operator '"+syntax+"'  must take two operands.");
+            if (!left.HasValue || !right.HasValue)
+                throw new ExpressionEvalError(eval, "A binary operator '" + syntax + "'  must take two operands.");
             try
             {
                 result = oper.Invoke(null, parameters: [left, right]);
@@ -815,7 +800,7 @@ public class Operators
     public static double Negate(Token right)
     {
         return -(double)right.GetVal();
-    }   
+    }
     [OperatorDefinition(TokenType.None, TokenType.Bool, "!", 0, DataType.Bool)]
     public static bool BoolNegate(Token left)
     {
@@ -858,7 +843,7 @@ public class Operators
     {
         return left.type != TokenType.Unset;
     }
-     [OperatorDefinition(TokenType.None, TokenType.Any, "typeof", 0, DataType.Type)]
+    [OperatorDefinition(TokenType.None, TokenType.Any, "typeof", 0, DataType.Type)]
     public static DataType TypeOfOperator(Token right)
     {
         return right.GetValVar().type;
@@ -894,7 +879,7 @@ public class Operators
     [OperatorDefinition(TokenType.Number, TokenType.Number, "°°", 1, DataType.Number)]
     public static double Root(Token left, Token right)
     {
-        return Math.Pow((double)right.GetVal(), 1/(double)left.GetVal());
+        return Math.Pow((double)right.GetVal(), 1 / (double)left.GetVal());
     }
     //addative
     [OperatorDefinition(TokenType.Number, TokenType.Number, "+", 2, DataType.Number)]
@@ -912,14 +897,14 @@ public class Operators
     {
         var arr = ((VArray)left.GetVal()).ToArray();
         var val = right.GetValVar();
-        return [..arr,val];
+        return [.. arr, val];
     }
     [OperatorDefinition(TokenType.Array, TokenType.Array, "+", 2, DataType.Array)]
     public static VArray ArrayAddArray(Token left, Token right)
     {
         var arr = ((VArray)left.GetVal()).ToArray();
         var val = ((VArray)right.GetValVar().value).ToArray();
-        return [..arr,..val];
+        return [.. arr, .. val];
     }
     [OperatorDefinition(TokenType.Any, TokenType.Any, "+", 2, DataType.String)]
     public static string Add(Token left, Token right)
@@ -973,13 +958,13 @@ public class Operators
     {
         return left.GetValVar().type == (DataType)right.GetVal();
     }
-    
+
     [OperatorDefinition(TokenType.Any, TokenType.Array, "is", 5, DataType.Bool)]
     public static bool IsOperatorArray(Token left, Token right)
     {
         var values = (VArray)right.GetValVar().value;
-        var vals_ = values.Select(x=>(DataType)x.value);
-        return vals_.Any(x=>x==left.GetValVar().type);
+        var vals_ = values.Select(x => (DataType)x.value);
+        return vals_.Any(x => x == left.GetValVar().type);
     }
     [OperatorDefinition(TokenType.Any, TokenType.Any, "==", 5, DataType.Bool)]
     public static bool Equals(Token left, Token right)
@@ -1042,6 +1027,7 @@ public enum TokenType
     GroupType = 17,
     Int = 18,
     Class = 19,
+    Dotable = 20,
     Ignore = 100,
 
     Unknown = -1 //  some garbage

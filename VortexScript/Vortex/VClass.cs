@@ -32,5 +32,9 @@ public class VClassInstance{
         Type = type;
         InstanceVars = vars;
     }
+
+    public override string ToString(){
+        return Type+"_instance";
+    }
     
 }

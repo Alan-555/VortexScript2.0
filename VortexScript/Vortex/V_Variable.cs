@@ -72,6 +72,10 @@ public abstract class V_Variable
     {
         return null;
     }
+    public virtual V_Variable GetField(string identifier)
+    {
+        throw new IlegalOperationError($"The type '{type}' cannot be accessed with the dot notation.");
+    }
 
 
     public virtual V_Variable Index(IndexerRange index)
@@ -403,6 +407,14 @@ public class VType_Module : V_Variable
     {
         moduleRef ??= (VContext)value;
         return moduleRef.Name;
+    }
+
+    public override V_Variable GetField(string identifier)
+    {
+        if(!Interpreter.ReadVar(identifier,out var ret,moduleRef)){
+            throw new UnknownNameError(identifier);
+        }
+        return ret!;
     }
 }
 
