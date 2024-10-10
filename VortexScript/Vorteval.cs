@@ -248,11 +248,13 @@ public class Evaluator
             }
             else if (tokens[i].type == TokenType.Module && tokens[i].isDot)
             {
-
-                var dotable = Evaluator.Evaluate(tokens[i].value);
+                if(i==tokens.Count-1){
+                    throw new ExpectedTokenError("identifier");
+                }
+                var dotable = tokens[i].actualValue==null ? Evaluator.Evaluate(tokens[i].value) : tokens[i].GetValVar();
                 var other = dotable.GetField(tokens[i + 1].value);
                 tokens[i] = new(TokenType.Ignore, "");
-                tokens[i + 1] = new(DataTypeToTokenType(other.type), other.ToString(), other.value);
+                tokens[i + 1] = new(DataTypeToTokenType(other.type), other.ToString(), other.value){isDot = tokens[i + 1].isDot};
 
             }
             else if (tokens[i].type == TokenType.Array)
@@ -1026,8 +1028,9 @@ public enum TokenType
     Error = 16,
     GroupType = 17,
     Int = 18,
-    Class = 19,
-    Dotable = 20,
+    Object = 19,
+    Class = 20,
+
     Ignore = 100,
 
     Unknown = -1 //  some garbage

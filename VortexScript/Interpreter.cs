@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using VortexScript.Structs;
 using VortexScript.Definitions;
 using VortexScript.Vortex;
+using System.Diagnostics;
 
 namespace VortexScript;
 
@@ -1196,6 +1197,7 @@ public class Interpreter
     public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, DataType type = DataType.Any)
     {
         Dictionary<string, V_Variable> vars;
+        val = null;
         if (context == null)
         {
             //gets all variables in the current frame

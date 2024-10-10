@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using VortexScript.Definitions;
 
 namespace VortexScript.Vortex;
@@ -30,6 +31,7 @@ public abstract class V_Variable
             { DataType.Int, typeof(VType_Int)},
             { DataType.Function, typeof(VType_Function)},
             { DataType.Class, typeof(VType_Class)},
+            { DataType.Object, typeof(VType_Object)},
         };
 
     public DataType type;
@@ -341,6 +343,31 @@ public class VType_Class : V_Variable
         return GetClass().Constructor;
     }
 }
+public class VType_Object : V_Variable
+{
+    public VClassInstance GetClass(){
+        return (VClassInstance)this.value;
+    }
+    public VType_Object(DataType type, object value, V_VarFlags flags) : base(type, value, flags) { }
+
+    public override object ConvertToCSharpType(string v)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override string ToString()
+    {
+        return GetClass().Type.Identifier+"_instace("+RuntimeHelpers.GetHashCode(GetClass())+")";
+    }
+    public override V_Variable GetField(string identifier)
+    {
+        if(!GetClass().InstanceVars.TryGetValue(identifier, out var ret)){
+            throw new UnknownNameError(identifier);
+        }
+        return ret;
+    }
+
+}
 
 
 public class VType_Unset : V_Variable
@@ -411,7 +438,7 @@ public class VType_Module : V_Variable
 
     public override V_Variable GetField(string identifier)
     {
-        if(!Interpreter.ReadVar(identifier,out var ret,moduleRef)){
+        if(!Interpreter.ReadVar(identifier,out var ret,(VContext)value)){
             throw new UnknownNameError(identifier);
         }
         return ret!;
@@ -545,5 +572,6 @@ public enum DataType
     GroupType = 11,
     Function = 12,
     None = 13,
-    Class = 14
+    Class = 14,
+    Object = 15
 }

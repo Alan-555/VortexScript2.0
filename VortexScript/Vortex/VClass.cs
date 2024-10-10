@@ -18,8 +18,8 @@ public class VClass{
         };
     }
 
-    public static VClassInstance ConstructType(VClass class_){
-        return new VClassInstance(class_,new(){{"testVar",V_Variable.Construct(DataType.Number,5d)}});
+    public static V_Variable ConstructType(VClass class_){
+        return V_Variable.Construct(DataType.Object,new VClassInstance(class_,new(){{"testVar",V_Variable.Construct(DataType.Number,5d)}}));
     }
     
 }
@@ -34,7 +34,7 @@ public class VClassInstance{
     }
 
     public override string ToString(){
-        return Type+"_instance";
+        return Type.Identifier+"_instance";
     }
     
 }
