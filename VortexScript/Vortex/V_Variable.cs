@@ -29,6 +29,7 @@ public abstract class V_Variable
             { DataType.GroupType, typeof(VType_Tag)},
             { DataType.Int, typeof(VType_Int)},
             { DataType.Function, typeof(VType_Function)},
+            { DataType.Class, typeof(VType_Class)},
         };
 
     public DataType type;
@@ -67,6 +68,12 @@ public abstract class V_Variable
 
     public abstract object ConvertToCSharpType(string v);
     public abstract override string ToString();
+    public virtual VFunc? GetCallableFunc(params object[] args)
+    {
+        return null;
+    }
+
+
     public virtual V_Variable Index(IndexerRange index)
     {
         throw new IlegalOperationError($"The type '{type}' is not indexable");
@@ -323,6 +330,11 @@ public class VType_Class : V_Variable
     public override string ToString()
     {
         return GetClass().Identifier;
+    }
+
+    public override VFunc? GetCallableFunc(params object[] args)
+    {
+        return GetClass().Constructor;
     }
 }
 

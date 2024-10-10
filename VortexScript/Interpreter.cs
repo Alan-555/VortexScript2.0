@@ -422,7 +422,7 @@ public class Interpreter
                     if(!Utils.IsIdentifierValid(class_.Identifier)){
                         throw new InvalidIdentifierError(class_.Identifier);
                     }
-                    var var = V_Variable.Construct(DataType.Type,class_);
+                    var var = V_Variable.Construct(DataType.Class,class_);
                     if(!DeclareVar(class_.Identifier,var)){
                         throw new IdentifierAlreadyUsedError(class_.Identifier);
                     }
@@ -698,9 +698,18 @@ public class Interpreter
             {
                 context = (VContext)Evaluator.Evaluate(module, DataType.Module).value;
             }
-            if (!ReadVar(identifier, out var func_, context, type: DataType.Function))
+            VClass? class_ = null;
+            if (!ReadVar(identifier, out var func_, context))
             {
                 throw new UnknownNameError(identifier);
+            }
+            else{
+                if(func_!.type != DataType.Function){
+                    var f = ((VType_Class)func_).GetCallableFunc() ?? throw new IlegalOperationError($"'{identifier}' is not callable");
+                    class_ = (VClass)func_.value;
+                    func_ = V_Variable.Construct(DataType.Class,func_.value);
+                    func_.value = f;
+                }
             }
             if (func_!.value is not VFunc func)
                 throw new InvalidCastException("Function is not a VFunc");
@@ -716,6 +725,9 @@ public class Interpreter
             {
                 argsList.Add(func.Args[i].name, arg);
                 i++;
+            }
+            if(func.IsConstructor){
+                argsList.Add("class_",V_Variable.Construct(DataType.Class,class_));
             }
             val = CallFunction(func, argsList);
             if (itm)

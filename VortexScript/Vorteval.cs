@@ -79,6 +79,7 @@ public class Evaluator
         {DataType.Type,typeof(string)},
         {DataType.Error,typeof(string)},
         {DataType.GroupType,typeof(string)},
+        {DataType.Class,typeof(VClass)},
 
     };
 
@@ -1040,6 +1041,7 @@ public enum TokenType
     Error = 16,
     GroupType = 17,
     Int = 18,
+    Class = 19,
     Ignore = 100,
 
     Unknown = -1 //  some garbage

@@ -373,6 +373,7 @@ class Utils
         if(type == typeof(VFunc)) return DataType.Function;
         if(type == typeof(V_Variable)) return DataType.Any;
         if(type == typeof(VContext)) return DataType.Module;
+        if(type == typeof(VClass)) return DataType.Class;
 
         return DataType.None;
     }
