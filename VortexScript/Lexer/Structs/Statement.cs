@@ -30,7 +30,7 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
 
     public StatementType Expect(TokenType type, bool mandatory = true)
     {
-        Add(new(type,"",mandatory));
+        Add(new(type,""));
         return this;
     }
     public StatementType Expect(string syntax, bool mandatory = true)
@@ -49,7 +49,7 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
         return this;
     }
     
-    void Add(Token token,bool fixed_ = false){
+    void Add(Token token,bool fixed_ = false,bool mandatory = true){
         if(groupOpen){
             statementStruct.FindLast(x=>x!=null)!.tokens.Add(token);
         }
@@ -76,10 +76,13 @@ public class TokenGroup
     public List<Token> tokens = new();
     public bool and = false;
     public bool fixed_ = true;
+    
+    public bool mandatory = false;
 
-    public TokenGroup(List<Token> tokens,bool and = false){
+    public TokenGroup(List<Token> tokens,bool and = false,bool mandatory = true){
         this.tokens = tokens;
         this.and = and;
+        this.mandatory = mandatory;
     }
 
 }
@@ -88,13 +91,11 @@ public class Token
 {
     public TokenType tokenType = new();
     public string value = "";
-    public bool mandatory = false;
 
-    public Token(TokenType type, string value, bool mandatory = true)
+    public Token(TokenType type, string value)
     {
         tokenType = type;
         this.value = value;
-        this.mandatory = mandatory;
     }
 
 }
