@@ -4,6 +4,7 @@ using VortexScript.Structs;
 using VortexScript.Definitions;
 using VortexScript.Vortex;
 using System.Diagnostics;
+using VortexScript.Lexer.Structs;
 
 namespace VortexScript;
 
@@ -48,6 +49,8 @@ public class Interpreter
 
     public void Init()
     {
+        var xxx = StatementType.Init();
+        Lexer.Lexer.TokenizeThisStatement(xxx[2],"Math.x =");
         //load all statements
         statements = Assembly.GetAssembly(typeof(Interpreter))!.GetTypes()
                   .SelectMany(t => t.GetMethods())

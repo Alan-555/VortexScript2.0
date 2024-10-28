@@ -82,7 +82,7 @@ public class VortexError : Exception
 
 public class UnexpectedTokenError(params string[] args) : VortexError("Unexpected token '{0}'", ErrorType.Syntax, args);
 public class UnexpectedEndOfStatementError(params string[] args) : VortexError("Unexpected end of statement. {0} expected.", ErrorType.Syntax, args);
-public class ExpectedTokenError(params string[] args) : VortexError("'{0}' expected", ErrorType.Syntax, args);
+public class ExpectedTokenError(params string[] args) : VortexError("{0} expected", ErrorType.Syntax, args);
 public class UnknownStatementError(params string[] args) : VortexError("Unknown statement '{0}'", ErrorType.Syntax, args);
 public class ExpressionEvalError : VortexError
 {
