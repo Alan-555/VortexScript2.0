@@ -1,4 +1,5 @@
 using VortexScript.Definitions;
+using VortexScript.Lexer.Structs;
 
 namespace VortexScript.Vortex;
 
@@ -43,7 +44,7 @@ public class VFile
         FileFrame.ScopeStack.Push(TopLevelContext);
         new Interpreter(this).ExecuteFile();
     }
-    public string[] ReadFile()
+    public List<CompiledStatement> ReadFile()
     {
         if (Path == Program.InteractiveTermMode)
         {
@@ -53,7 +54,7 @@ public class VFile
         {
             bufferedFile = FileReader.ReadFile(Path);
         }
-        return bufferedFile;
+        return Lexer.Lexer.Tokenize(this);
     }
     public bool Exists()
     {

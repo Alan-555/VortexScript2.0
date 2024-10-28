@@ -14,38 +14,51 @@ public class Lexer
         statements = StatementType.Init();
     }
 
-    public List<object> Tokenize(VFile file)
+    public static  List<CompiledStatement> Tokenize(VFile file)
     {
         string[] lines = FileReader.ReadFile(file.Path);
+        var ret = new List<CompiledStatement>();
         for (int i = 0; i < lines.Length; i++)
         {
-
+            ret.Add(TokenizeStatement(lines[i]));
         }
-        return null;
+        return ret;
     }
 
-    public CompiledStatement TokenizeStatement(string statement)
+    public static CompiledStatement TokenizeStatement(string statement)
     {
+        statement = statement.Replace("\t", " ");
+        statement = statement.Replace("\r", "");
+        statement = Utils.RemoveInlineComments(statement);
+        statement = statement.Trim();
+        if(statement=="")
+            return new CompiledStatement([]);
         foreach (var item in statements)
         {
             if (item.CharStart == "")
             {
-
+                //TODO: omptimize
+                try{
+                    return TokenizeThisStatement(item, statement);
+                }
+                catch{
+                    continue;
+                }
             }
             else
             {
                 if (statement.StartsWith(item.CharStart))
                 {
-
+                    return TokenizeThisStatement(item, statement);
                 }
                 else
                     continue;
             }
         }
-        return default;
+        throw new UnknownStatementError(statement);
     }
 
-    public static CompiledStatement? TokenizeThisStatement(StatementType type, string statement)
+    public static CompiledStatement TokenizeThisStatement(StatementType type, string statement)
     {
         List<CompiledToken> ret = [];
         string current = statement;
@@ -204,18 +217,18 @@ public class Lexer
                 case Structs.TokenType.Expression:
                     satisfied = true;
                     if (!inBrackedExpression && build == "(") inBrackedExpression = true;
-                    if (inBrackedExpression && build == ")") goto ret;
+                    if (inBrackedExpression && build[^1] == ')') goto ret;
                     break;
                 case Structs.TokenType.StartScope:
-                    if (build == ":") { satisfied = true; goto ret; }
+                    if (build == ":") { satisfied = true; i++;goto ret; }
                     break;
                 case Structs.TokenType.EndScope:
-                    if (build == ";") { satisfied = true; goto ret; }
+                    if (build == ";") { satisfied = true;i++; goto ret; }
                     break;
                 case Structs.TokenType.Syntax:
                     if (!expectedSyntax.StartsWith(build))
                     {
-                        if (expectedSyntax == build[..1]) satisfied = true;
+                        if (expectedSyntax == build[..^1]) satisfied = true;
                         goto ret;
                     }
                     break;

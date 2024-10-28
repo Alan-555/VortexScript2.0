@@ -49,8 +49,6 @@ public class Interpreter
 
     public void Init()
     {
-        var xxx = StatementType.Init();
-        Lexer.Lexer.TokenizeThisStatement(xxx[2],"Math.x =");
         //load all statements
         statements = Assembly.GetAssembly(typeof(Interpreter))!.GetTypes()
                   .SelectMany(t => t.GetMethods())
@@ -160,7 +158,8 @@ public class Interpreter
         }
         else
         {
-            ExecuteLines(File.ReadFile());
+            var file = File.ReadFile();
+            ExecuteLines([]);
         }
     }
 

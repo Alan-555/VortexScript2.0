@@ -7,8 +7,9 @@ public struct Statement
 
 }
 
-public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum[]? validIn = null, ScopeTypeEnum scopeType = ScopeTypeEnum.topLevel, bool endsScope = false,bool invalidMode = false)
+public class StatementType(StatementId id, string StartsWith, bool StartsNewScope, ScopeTypeEnum[]? validIn = null, ScopeTypeEnum scopeType = ScopeTypeEnum.topLevel, bool endsScope = false,bool invalidMode = false)
 {
+    public StatementId Id { get; private set; } = id; 
     public string CharStart { get; private set; } = StartsWith; //if empty, this statement cannot be determined simply by keywords (e.g. declare function, assigment)
     public bool StartsNewScope { get; private set; } = StartsNewScope;
     public ScopeTypeEnum ScopeType { get; private set; } = scopeType;
@@ -64,8 +65,6 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
         }
     }
 
-
-
     public static StatementType DeclareStatement;
 
     public static List<StatementType> Init()
@@ -73,7 +72,7 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
         var list = new List<StatementType>
         {
             //declare
-            new StatementType("$", false)
+            new StatementType(StatementId.Declare, "$", false)
             .Expect("$")
             .StartGroup(GroupRule.GroupAny, true, false)
             .Expect("?")
@@ -86,103 +85,109 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
             .EndGroup(),
 
             //call function
-            new StatementType("", false)
+            new StatementType(StatementId.Call, "", false)
             .Expect(TokenType.Identifier)
             .ExpectAfter(TokenType.Args),
 
+            //declare function
+            new StatementType(StatementId.DeclareFunction, "", false)
+            .Expect(TokenType.DecleareIdentifier)
+            .ExpectAfter(TokenType.Args)
+            .Expect(TokenType.StartScope),
+
             //assignment
-            new StatementType("", false)
+            new StatementType(StatementId.Assignment, "", false)
             .Expect(TokenType.Identifier)
             .Expect("=")
             .Expect(TokenType.Expression),
 
             //output
-            new StatementType(">", false)
+            new StatementType(StatementId.Output, ">", false)
             .Expect(">")
             .Expect(TokenType.Expression),
 
             //return
-            new StatementType("<", false,[ScopeTypeEnum.functionScope])
+            new StatementType(StatementId.Return, "<", false, [ScopeTypeEnum.functionScope])
             .Expect("<")
             .Expect(TokenType.Expression),
 
             //if
-            new StatementType("if", true,[],ScopeTypeEnum.ifScope)
+            new StatementType(StatementId.If, "if", true, [], ScopeTypeEnum.ifScope)
             .Expect("if")
             .Expect(TokenType.Expression)
-            .ExpectAfter(TokenType.StartScope),
+            .Expect(TokenType.StartScope),
 
             //else
-            new StatementType("else", true,[ScopeTypeEnum.ifScope],ScopeTypeEnum.elseScope, true)
+            new StatementType(StatementId.Else, "else", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.elseScope, true)
             .Expect("else")
             .Expect(TokenType.Expression)
-            .ExpectAfter(TokenType.StartScope),
+            .Expect(TokenType.StartScope),
 
             //else if
-            new StatementType("else if", true, [ScopeTypeEnum.ifScope],ScopeTypeEnum.ifScope, true)
+            new StatementType(StatementId.ElseIf, "else if", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.ifScope, true)
             .Expect("else if")
             .Expect(TokenType.Expression)
-            .ExpectAfter(TokenType.StartScope),
+            .Expect(TokenType.StartScope),
 
             //end scope
-            new StatementType(";", false,[ScopeTypeEnum.topLevel],endsScope:true,invalidMode:true)
+            new StatementType(StatementId.EndScope, ";", false, [ScopeTypeEnum.topLevel], endsScope: true, invalidMode: true)
             .Expect(";"),
 
             //start scope
-            new StatementType(":", false,[], ScopeTypeEnum.genericScope)
+            new StatementType(StatementId.StartScope, ":", false, [], ScopeTypeEnum.genericScope)
             .Expect(":"),
 
             //exit
-            new StatementType("exit", false)
+            new StatementType(StatementId.Exit, "exit", false)
             .Expect("exit"),
 
             //acquire
-            new StatementType("acquire",false, [ScopeTypeEnum.topLevel])
+            new StatementType(StatementId.Acquire, "acquire", false, [ScopeTypeEnum.topLevel])
             .Expect("acquire")
             .Expect(TokenType.Identifier),
 
             //acquires
-            new StatementType("acquires", false, [ScopeTypeEnum.topLevel])
+            new StatementType(StatementId.Acquires, "acquires", false, [ScopeTypeEnum.topLevel])
             .Expect("acquires")
             .Expect(TokenType.Identifier),
 
             //release
-            new StatementType("release", false)
+            new StatementType(StatementId.Release, "release", false)
             .Expect("release")
             .Expect(TokenType.Expression),
 
             //set directive
-            new StatementType("#", false)
+            new StatementType(StatementId.SetDirective, "#", false)
             .Expect("#")
             .ExpectAfter(TokenType.Identifier)
             .Expect(TokenType.Expression),
 
             //raise
-            new StatementType("raise", false)
+            new StatementType(StatementId.Raise, "raise", false)
             .Expect("raise")
             .Expect(TokenType.Expression)
-            .Expect(TokenType.Expression,false),
+            .Expect(TokenType.Expression, false),
 
             //assert
-            new StatementType("assert", false)
+            new StatementType(StatementId.Assert, "assert", false)
             .Expect("assert")
             .Expect(TokenType.Expression)
-            .Expect(TokenType.Expression,false),
+            .Expect(TokenType.Expression, false),
 
             //class
-            new StatementType("class",true,[ScopeTypeEnum.classScope],ScopeTypeEnum.classScope)
+            new StatementType(StatementId.Class, "class", true, [ScopeTypeEnum.classScope], ScopeTypeEnum.classScope)
             .Expect("class")
             .Expect(TokenType.DecleareIdentifier)
             .Expect(TokenType.StartScope),
 
             //while
-            new StatementType("while", true,[],ScopeTypeEnum.loopScope)
+            new StatementType(StatementId.While, "while", true, [], ScopeTypeEnum.loopScope)
             .Expect("while")
             .Expect(TokenType.Expression)
             .Expect(TokenType.StartScope),
 
             //break
-            new StatementType("break", false,[ScopeTypeEnum.loopScope])
+            new StatementType(StatementId.Break, "break", false, [ScopeTypeEnum.loopScope])
             .Expect("break"),
 
 
@@ -195,6 +200,32 @@ public class StatementType(string StartsWith, bool StartsNewScope, ScopeTypeEnum
 
 
 }
+
+
+public enum StatementId{
+    Declare,
+    Call,
+    DeclareFunction,
+    Assignment,
+    Output,
+    Return,
+    If,
+    Else,
+    ElseIf,
+    EndScope,
+    StartScope,
+    Exit,
+    Acquire,
+    Acquires,
+    Release,
+    SetDirective,
+    Raise,
+    Assert,
+    Class,
+    While,
+    Break,
+}
+
 public class TokenGroup
 {
     public List<Token> tokens = new();
