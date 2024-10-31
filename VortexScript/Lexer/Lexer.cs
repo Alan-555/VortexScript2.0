@@ -32,7 +32,7 @@ public class Lexer
         statement = Utils.RemoveInlineComments(statement);
         statement = statement.Trim();
         if(statement=="")
-            return new CompiledStatement([]);
+            return new CompiledStatement(StatementId.PASS,[]);
         foreach (var item in statements)
         {
             if (item.CharStart == "")
@@ -182,7 +182,7 @@ public class Lexer
         }
         //if there is still something in statement we are not expecting it
         if (current != "") throw new UnexpectedTokenError(current);
-        return new([.. ret]);
+        return new(type.Id,[.. ret]);
     }
 
     public static int GetTokenEnd(Structs.TokenType type, string value, string expectedSyntax = "")

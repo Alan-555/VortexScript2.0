@@ -71,6 +71,7 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
     {
         var list = new List<StatementType>
         {
+            
             //declare
             new StatementType(StatementId.Declare, "$", false)
             .Expect("$")
@@ -83,23 +84,6 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             .Expect("=")
             .Expect(TokenType.Expression)
             .EndGroup(),
-
-            //call function
-            new StatementType(StatementId.Call, "", false)
-            .Expect(TokenType.Identifier)
-            .ExpectAfter(TokenType.Args),
-
-            //declare function
-            new StatementType(StatementId.DeclareFunction, "", false)
-            .Expect(TokenType.DecleareIdentifier)
-            .ExpectAfter(TokenType.Args)
-            .Expect(TokenType.StartScope),
-
-            //assignment
-            new StatementType(StatementId.Assignment, "", false)
-            .Expect(TokenType.Identifier)
-            .Expect("=")
-            .Expect(TokenType.Expression),
 
             //output
             new StatementType(StatementId.Output, ">", false)
@@ -190,6 +174,23 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             new StatementType(StatementId.Break, "break", false, [ScopeTypeEnum.loopScope])
             .Expect("break"),
 
+                        //call function
+            new StatementType(StatementId.Call, "", false)
+            .Expect(TokenType.Identifier)
+            .ExpectAfter(TokenType.Args),
+
+            //declare function
+            new StatementType(StatementId.DeclareFunction, "", false)
+            .Expect(TokenType.DecleareIdentifier)
+            .ExpectAfter(TokenType.Args)
+            .Expect(TokenType.StartScope),
+
+            //assignment
+            new StatementType(StatementId.Assignment, "", false)
+            .Expect(TokenType.Identifier)
+            .Expect("=")
+            .Expect(TokenType.Expression),
+
 
         };
 
@@ -224,6 +225,7 @@ public enum StatementId{
     Class,
     While,
     Break,
+    PASS
 }
 
 public class TokenGroup

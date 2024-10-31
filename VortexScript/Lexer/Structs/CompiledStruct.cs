@@ -1,9 +1,11 @@
 namespace VortexScript.Lexer.Structs;
 
 public struct CompiledStatement{
+    public StatementId id;
     public CompiledToken[] tokens;
 
-    public CompiledStatement(CompiledToken[] tokens){
+    public CompiledStatement(StatementId id,CompiledToken[] tokens){
+        this.id = id;
         this.tokens = tokens;
     }
 }

@@ -885,6 +885,69 @@ public class Interpreter
 
     }
 
+    public void DeclareStatementNew(CompiledStatement statement)
+    {
+        //statement = statement.Replace(":connect","=");
+        bool unsetable = statement
+        bool readonly_ = statement[1] == '!';
+        bool unlink = statement[1] == '$';
+        if (unsetable || readonly_)
+        {
+            statement = statement.Remove(1, 1);
+        }
+        if (unlink)
+        {
+            string identifer_ = statement[2..];
+            bool removed = false;
+            foreach (var context in GetCurrentFrame().ScopeStack)
+            {
+                removed = context.Variables.Remove(identifer_);
+                if (removed) return;
+            }
+            if (!removed)
+            {
+                throw new UnknownNameError(identifer_);
+            }
+        }
+        bool init = Utils.StringContains(statement, "=");
+        string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];
+        if (!Utils.IsIdentifierValid(identifier, true))
+        {
+            throw new InvalidIdentifierError(identifier);
+        }
+        if (init)
+        {
+            if (statement.EndsWith('='))
+            {
+                throw new UnexpectedEndOfStatementError("Expression");
+            }
+            var initVal = Evaluator.Evaluate(statement[(statement.IndexOf('=') + 1)..]);
+            initVal.flags.unsetable = unsetable;
+            initVal.flags.readonly_ = readonly_;
+            bool failed = false;
+
+            if (!DeclareVar(identifier, initVal))
+                failed = true;
+
+            if (failed)
+            {
+                throw new IdentifierAlreadyUsedError(identifier);
+            }
+        }
+        else
+        {
+            if (readonly_)
+            {
+                throw new IlegalDeclarationError("A read-only variable has to be initialized");
+            }
+            if (!DeclareVar(identifier, V_Variable.Construct(DataType.Unset, "unset", new() { unsetable = unsetable })))
+            {
+                throw new IdentifierAlreadyUsedError(identifier);
+            }
+        }
+
+    }
+
     [MarkStatement("#FAIL#", false)]
     public void DebugFail(string statement)
     {
