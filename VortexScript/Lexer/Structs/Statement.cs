@@ -1,20 +1,20 @@
 using VortexScript.Vortex;
 
-namespace VortexScript.Lexer.Structs;
+namespace VortexScript.Lexer.LexerStructs;
 
 public struct Statement
 {
 
 }
 
-public class StatementType(StatementId id, string StartsWith, bool StartsNewScope, ScopeTypeEnum[]? validIn = null, ScopeTypeEnum scopeType = ScopeTypeEnum.topLevel, bool endsScope = false,bool invalidMode = false)
+public class StatementType(StatementId id, string StartsWith, bool StartsNewScope, ScopeTypeEnum[]? validIn = null, ScopeTypeEnum scopeType = ScopeTypeEnum.topLevel, bool endsScope = false, bool invalidMode = false)
 {
-    public StatementId Id { get; private set; } = id; 
+    public StatementId Id { get; private set; } = id;
     public string CharStart { get; private set; } = StartsWith; //if empty, this statement cannot be determined simply by keywords (e.g. declare function, assigment)
     public bool StartsNewScope { get; private set; } = StartsNewScope;
     public ScopeTypeEnum ScopeType { get; private set; } = scopeType;
     public bool EndsScope { get; private set; } = endsScope;
-    public ScopeTypeEnum[] ValidIn {get; private set;} = validIn ?? [];
+    public ScopeTypeEnum[] ValidIn { get; private set; } = validIn ?? [];
     public bool InvalidInMode { get; private set; } = invalidMode;
 
     public List<TokenGroup> statementStruct = new();
@@ -53,7 +53,7 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
         return this;
     }
 
-    void Add(Token token, GroupRule multiple = GroupRule.GroupAny, bool fixed_ = false, bool mandatory = true)
+    void Add(LexerToken token, GroupRule multiple = GroupRule.GroupAny, bool fixed_ = false, bool mandatory = true)
     {
         if (groupOpen)
         {
@@ -61,7 +61,7 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
         }
         else
         {
-            statementStruct.Add(new TokenGroup(new List<Token>() { token }, multiple, fixed_, mandatory));
+            statementStruct.Add(new TokenGroup(new List<LexerToken>() { token }, multiple, fixed_, mandatory));
         }
     }
 
@@ -70,7 +70,12 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
     public static List<StatementType> Init()
     {
         var list = new List<StatementType>
-        {
+        {//TODO: dissaloved combos like $! without initializer
+
+             //unlink
+            new StatementType(StatementId.Unlink, "$$", false)
+            .Expect("$$")
+            .ExpectAfter(TokenType.Identifier),
             
             //declare
             new StatementType(StatementId.Declare, "$", false)
@@ -104,7 +109,6 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             //else
             new StatementType(StatementId.Else, "else", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.elseScope, true)
             .Expect("else")
-            .Expect(TokenType.Expression)
             .Expect(TokenType.StartScope),
 
             //else if
@@ -199,11 +203,12 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
     }
 
 
-
 }
 
 
-public enum StatementId{
+
+public enum StatementId
+{
     Declare,
     Call,
     DeclareFunction,
@@ -225,17 +230,18 @@ public enum StatementId{
     Class,
     While,
     Break,
+    Unlink,
     PASS
 }
 
 public class TokenGroup
 {
-    public List<Token> tokens = new();
+    public List<LexerToken> tokens = new();
     public GroupRule groupType = GroupRule.GroupAny;
     public bool fixed_ = false; //expect right after. No white space is allowed when true
     public bool mandatory = true; //if true- the group may be ommited
 
-    public TokenGroup(List<Token> tokens, GroupRule groupType = GroupRule.GroupAny, bool fixed_ = false, bool mandatory = true)
+    public TokenGroup(List<LexerToken> tokens, GroupRule groupType = GroupRule.GroupAny, bool fixed_ = false, bool mandatory = true)
     {
         this.tokens = tokens;
         this.groupType = groupType;
@@ -245,18 +251,19 @@ public class TokenGroup
 
 }
 
-public class Token
+public class LexerToken
 {
     public TokenType tokenType = new();
     public string value = "";
 
-    public Token(TokenType type, string value)
+    public LexerToken(TokenType type, string value)
     {
         tokenType = type;
         this.value = value;
     }
 
-    public string TypeToString(){
+    public string TypeToString()
+    {
         switch (tokenType)
         {
             case TokenType.Identifier:
@@ -270,7 +277,7 @@ public class Token
             case TokenType.EndScope:
                 return "';'";
             case TokenType.Syntax:
-                return "'"+value+"'";
+                return "'" + value + "'";
             case TokenType.Args:
                 return "arguments";
         }

@@ -1,10 +1,10 @@
 using VortexScript.Definitions;
-using VortexScript.Lexer.Structs;
+using VortexScript.Lexer.LexerStructs;
 using VortexScript.Vortex;
 
 namespace VortexScript.Lexer;
 
-public class Lexer
+public class LexicalAnalyzer
 {
 
     public static List<StatementType> statements;
@@ -96,11 +96,11 @@ public class Lexer
                     lastPresentIndex = i;
                     //we found a token in the current group
                     groupCount++;
-                    if (token.tokenType == Structs.TokenType.Args)
+                    if (token.tokenType == LexerStructs.TokenType.Args)
                     {
                         ret.Add(new(Utils.StringSplit(current[1..(end - 1)], ',')));
                     }
-                    else if (token.tokenType == Structs.TokenType.Identifier)
+                    else if (token.tokenType == LexerStructs.TokenType.Identifier)
                     {
                         ret.Add(new(Utils.StringSplit(current[0..end], '.'), true));
                     }
@@ -185,7 +185,7 @@ public class Lexer
         return new(type.Id,[.. ret]);
     }
 
-    public static int GetTokenEnd(Structs.TokenType type, string value, string expectedSyntax = "")
+    public static int GetTokenEnd(LexerStructs.TokenType type, string value, string expectedSyntax = "")
     {
         int i = -1;
         string build = "";
@@ -199,7 +199,7 @@ public class Lexer
             build += value[i];
             switch (type)
             {
-                case Structs.TokenType.Identifier:
+                case LexerStructs.TokenType.Identifier:
                     if (!satisfied && Utils.IsIdentifierValid(build)) satisfied = true;
                     if (build[^1] == '.')
                     {
@@ -210,43 +210,72 @@ public class Lexer
                     else wasDot = false;
                     if (!Utils.IsIdentifierValid(build[lastDot..]) && build[^1] != '.') goto ret;
                     break;
-                case Structs.TokenType.DecleareIdentifier:
+                case LexerStructs.TokenType.DecleareIdentifier:
                     if (!satisfied && Utils.IsIdentifierValid(build)) satisfied = true;
                     if (!Utils.IsIdentifierValid(build)) goto ret; //TODO: check if not already used
                     break;
-                case Structs.TokenType.Expression:
+                case LexerStructs.TokenType.Expression:
                     satisfied = true;
                     if (!inBrackedExpression && build == "(") inBrackedExpression = true;
                     if (inBrackedExpression && build[^1] == ')') goto ret;
+                    if(!inBrackedExpression && build[^1]==' ') goto ret;
                     break;
-                case Structs.TokenType.StartScope:
+                case LexerStructs.TokenType.StartScope:
                     if (build == ":") { satisfied = true; i++;goto ret; }
                     break;
-                case Structs.TokenType.EndScope:
+                case LexerStructs.TokenType.EndScope:
                     if (build == ";") { satisfied = true;i++; goto ret; }
                     break;
-                case Structs.TokenType.Syntax:
+                case LexerStructs.TokenType.Syntax:
                     if (!expectedSyntax.StartsWith(build))
                     {
                         if (expectedSyntax == build[..^1]) satisfied = true;
                         goto ret;
                     }
                     break;
-                case Structs.TokenType.Args:
+                case LexerStructs.TokenType.Args:
                     if (value[0] != '(') return -1;
                     return Utils.StringGetMatchingPer(value) + 1;
             }
         }
-        if (type == Structs.TokenType.Syntax)
+        if (type == LexerStructs.TokenType.Syntax)
         {
             if (expectedSyntax == build) satisfied = true;
         }
-        if (type != Structs.TokenType.Expression)
+        if (type != LexerStructs.TokenType.Expression)
             i++;
         ret:
-        if (type == Structs.TokenType.Expression) return i + 1;
+        if (type == LexerStructs.TokenType.Expression) return i + 1;
         if (!satisfied) return -1;
         return i;
     }
 
+
+    public static bool StatementContainsSyntax(CompiledStatement statement,string syntax){
+        foreach (var item in statement.tokens)
+        {
+            if(item.type == LexerStructs.TokenType.Syntax&& item.leaf == syntax) return true;
+        }
+        return false;
+    }
+    public static string StatementGetIdentifier(CompiledStatement statement){
+        return StatementGetFirst(statement, LexerStructs.TokenType.Identifier);
+    }
+    public static string StatementGetExpression(CompiledStatement statement){
+        return StatementGetFirst(statement, LexerStructs.TokenType.Expression);
+    }
+    public static string StatementGetFirst(CompiledStatement statement, LexerStructs.TokenType type){
+        foreach (var item in statement.tokens)
+        {
+            if(item.type == type) return item.leaf!;
+        }
+        throw new Exception("Lexical analysis error: "+type.ToString()+" not found in statement");
+    }
+    
+    public static StatementType GetStatementType(StatementId id){//TODO: make it a dict
+        foreach(StatementType statementType in statements){
+            if(statementType.Id == id) return statementType;
+        }
+        return null!;
+    }
 }

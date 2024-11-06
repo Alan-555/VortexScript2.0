@@ -1,5 +1,5 @@
 using VortexScript.Definitions;
-using VortexScript.Lexer.Structs;
+using VortexScript.Lexer.LexerStructs;
 
 namespace VortexScript.Vortex;
 
@@ -54,7 +54,7 @@ public class VFile
         {
             bufferedFile = FileReader.ReadFile(Path);
         }
-        return Lexer.Lexer.Tokenize(this);
+        return Lexer.LexicalAnalyzer.Tokenize(this);
     }
     public bool Exists()
     {

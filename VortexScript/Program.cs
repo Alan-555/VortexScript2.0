@@ -9,7 +9,7 @@ public class Program
     public static void Main(string[] args)
     {
         //Initialize the lexical analyser
-        Lexer.Lexer.Init();
+        Lexer.LexicalAnalyzer.Init();
         string file;
         if (args.Length == 0)
         {

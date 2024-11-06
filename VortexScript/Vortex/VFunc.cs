@@ -1,4 +1,5 @@
 using System.Reflection;
+using VortexScript.Lexer.LexerStructs;
 using VortexScript.Structs;
 
 namespace VortexScript.Vortex;
@@ -9,7 +10,7 @@ public class VFunc
     public VFile File { get; private set; }
     public VFuncArg[] Args { get; private set; }
 
-    public string[] FunctionBody { get; set; } = [];
+    public CompiledStatement[] FunctionBody { get; set; } = [];
     public int StartLine { get; private set; }
     public MethodInfo? CSharpFunc { get; set; } = null;
     public bool ForceUppercase { get; set; } = false;

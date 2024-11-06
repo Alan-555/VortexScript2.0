@@ -4,7 +4,8 @@ using VortexScript.Structs;
 using VortexScript.Definitions;
 using VortexScript.Vortex;
 using System.Diagnostics;
-using VortexScript.Lexer.Structs;
+using VortexScript.Lexer.LexerStructs;
+using VortexScript.Lexer;
 
 namespace VortexScript;
 
@@ -138,8 +139,8 @@ public class Interpreter
                     {
                         Console.Write("｜");
                         Console.Write("\t");
-                    }
-                    if (Directives.DIR_bufferMode.value)
+                    }//TODO: remake buffer mode
+                    /*if (Directives.DIR_bufferMode.value)
                     {
                         List<string> list = [];
                         while (true)
@@ -149,30 +150,30 @@ public class Interpreter
                                 break;
                             list.Add(input);
                         }
-                        ExecuteLines([.. list]);
-                    }
+                        ExecuteStatements([.. list]);
+                    }*/
                 }
                 ITM_Buffer = [.. ITM_Buffer, Console.ReadLine()!];
-                ExecuteLines(ITM_Buffer);
+                ExecuteStatements([LexicalAnalyzer.TokenizeStatement(ITM_Buffer[0])]);
             }
         }
         else
         {
             var file = File.ReadFile();
-            ExecuteLines([]);
+            ExecuteStatements([.. file]);
         }
     }
 
-    V_Variable? ExecuteLines(string[] lines)
+    V_Variable? ExecuteStatements(CompiledStatement[] statements)
     {
-        while (GetCurrentFrame().currentLine < lines.Length)
+        while (GetCurrentFrame().currentLine < statements.Length)
         {
 
-            string line;
-            line = lines[GetCurrentFrame().currentLine];
+            CompiledStatement statement;
+            statement = statements[GetCurrentFrame().currentLine];
             try
             {
-                ExecuteLine(line);
+                ExecuteStatement(statement);
             }
             catch (VortexError e)
             {
@@ -226,28 +227,16 @@ public class Interpreter
         }
         return null;
     }
-
-    public void ExecuteLine(string line)
+    public void ExecuteStatement(CompiledStatement statement)
     {
-        line = Utils.RemoveInlineComments(line);
-        line = line.Trim();
         var func = GetCurrentContext().FuncBeingRead;
         if (func != null)
-            func.FunctionBody = [.. func.FunctionBody, line];
-        if (line == "endbuffer")
-        {
-            throw new IlegalOperationError("No buffer opened or not in ITM");
-        }
-        ExecuteStatement(line);
-
-    }
-    public void ExecuteStatement(string statement)
-    {
-        if (statement == "") return;
+            func.FunctionBody = [.. func.FunctionBody, statement];
+        if (statement.id == StatementId.PASS) return;
         MethodInfo? statementToExec = null;
-        foreach (var statement_ in statements)
+        foreach (var statement_ in statements)//TODO: convert to dict
         {
-            if (statement.StartsWith(Utils.GetStatementAttribute(statement_, StatementAttributes.beginsWith).ToString().Replace("\"", "")))
+            if (statement.id == ((StatementId)Utils.GetStatementAttribute(statement_, 0).Value!))
             {
                 statementToExec = statement_;
                 break;
@@ -255,47 +244,27 @@ public class Interpreter
         }
         try
         {
-            if (statementToExec == null)
+
+            //TODO: finish
+            if (itm)
             {
-                if (GetCurrentContext().Ignore)
+                try
                 {
-                    return;
+                    Console.WriteLine("> " + Evaluator.Evaluate(statement));
                 }
-                //check for assignment
-                if (AssignStatement(statement))
-                    return;
-                else
-                if (FuncDeclaration(statement))
-                    return;
-                else
-                if (CallFunctionStatement(statement, out _))
+                catch
                 {
-                    return;
+                    //throw new UnknownStatementError(statement.);
                 }
-                else
-                {
-                    if (itm)
-                    {
-                        try
-                        {
-                            Console.WriteLine("> " + Evaluator.Evaluate(statement));
-                        }
-                        catch
-                        {
-                            throw new UnknownStatementError(statement);
-                        }
-                        return;
-                    }
-                    else
-                        throw new UnknownStatementError(statement);
-                }
+                return;
             }
-            bool endsScope = (bool)Utils.GetStatementAttribute(statementToExec, StatementAttributes.endScope).Value!;
-            bool startsScope = (bool)Utils.GetStatementAttribute(statementToExec, StatementAttributes.mewScope).Value!;
+            var statementType = LexicalAnalyzer.GetStatementType(statement.id);
+            bool endsScope = statementType.EndsScope;
+            bool startsScope = statementType.StartsNewScope;
             //border statement
             if (endsScope && startsScope)
             {
-                if (statementToExec.Name == "ElseScopeStatement")
+                if (statement.id == StatementId.Else)
                 {
                     var context = GetCurrentContext();
                     if (context.ScopeType != ScopeTypeEnum.ifScope)
@@ -314,7 +283,7 @@ public class Interpreter
                     else
                         GetCurrentContext().Ignore = !context.Ignore;
                 }
-                else if (statementToExec.Name == "ElseIfScopeStatement")
+                else if (statement.id == StatementId.ElseIf)
                 {
                     var context = GetCurrentContext();
                     if (context.ScopeType != ScopeTypeEnum.ifScope)
@@ -333,8 +302,8 @@ public class Interpreter
                     }
                     else
                         GetCurrentContext().Ignore = !context.Ignore;
-                }
-                else if (statementToExec.Name == "CatchScopeStartStement")
+                }//TODO: catch
+                /*else if (statement.id == StatementId.Catch)
                 {
                     var tryContext = GetCurrentContext();
                     if (tryContext.ScopeType != ScopeTypeEnum.tryScope && tryContext.ScopeType != ScopeTypeEnum.catchScope)
@@ -394,7 +363,7 @@ public class Interpreter
 
 
                     }
-                }
+                }*/
             }
             else
             if (endsScope)
@@ -420,13 +389,16 @@ public class Interpreter
                         GetCurrentFrame().currentLine = context.StartLine - 1;
                     }
                 }
-                if(context.ScopeType == ScopeTypeEnum.classScope){
-                    var class_ = new VClass(context.Name,context.File!);
-                    if(!Utils.IsIdentifierValid(class_.Identifier)){
+                if (context.ScopeType == ScopeTypeEnum.classScope)
+                {
+                    var class_ = new VClass(context.Name, context.File!);
+                    if (!Utils.IsIdentifierValid(class_.Identifier))
+                    {
                         throw new InvalidIdentifierError(class_.Identifier);
                     }
-                    var var = V_Variable.Construct(DataType.Class,class_);
-                    if(!DeclareVar(class_.Identifier,var)){
+                    var var = V_Variable.Construct(DataType.Class, class_);
+                    if (!DeclareVar(class_.Identifier, var))
+                    {
                         throw new IdentifierAlreadyUsedError(class_.Identifier);
                     }
                 }
@@ -435,7 +407,7 @@ public class Interpreter
             if (startsScope)
             {
                 var prevContext = GetCurrentContext();
-                OpenNewContext((ScopeTypeEnum)Utils.GetStatementAttribute(statementToExec, StatementAttributes.scopeType).Value!);
+                OpenNewContext(statementType.ScopeType);
                 //inhirit igonre flag
                 GetCurrentContext().Ignore = prevContext.Ignore;
                 //inhirit function
@@ -706,11 +678,13 @@ public class Interpreter
             {
                 throw new UnknownNameError(identifier);
             }
-            else{
-                if(func_!.type != DataType.Function){
+            else
+            {
+                if (func_!.type != DataType.Function)
+                {
                     var f = ((VType_Class)func_).GetCallableFunc() ?? throw new IlegalOperationError($"'{identifier}' is not callable");
                     class_ = (VClass)func_.value;
-                    func_ = V_Variable.Construct(DataType.Class,func_.value);
+                    func_ = V_Variable.Construct(DataType.Class, func_.value);
                     func_.value = f;
                 }
             }
@@ -729,8 +703,9 @@ public class Interpreter
                 argsList.Add(func.Args[i].name, arg);
                 i++;
             }
-            if(func.IsConstructor){
-                argsList.Add("class_",V_Variable.Construct(DataType.Class,class_));
+            if (func.IsConstructor)
+            {
+                argsList.Add("class_", V_Variable.Construct(DataType.Class, class_));
             }
             val = CallFunction(func, argsList);
             if (itm)
@@ -811,58 +786,29 @@ public class Interpreter
             DeclareVar(arg.Key, arg.Value);
         }
         GetCurrentContext().InAFunc = true;
-        var val = funcInterpreter.ExecuteLines(func.FunctionBody);
+        var val = funcInterpreter.ExecuteStatements(func.FunctionBody);
         CallStack.Pop();
         return val;
     }
     //
-    [MarkStatement("$", false)]
-    public void DeclareStatement(string statement)
+    [MarkStatement(StatementId.Declare)]
+    public void DeclareStatement(CompiledStatement statement)
     {
         //statement = statement.Replace(":connect","=");
-        statement = Utils.StringRemoveSpaces(statement);
-        if (statement.Length < 2)
-        {
-            throw new ExpectedTokenError("Var modifier or an identifier");
-        }
-        bool unsetable = statement[1] == '?';
-        bool readonly_ = statement[1] == '!';
-        bool unlink = statement[1] == '$';
-        if (unsetable || readonly_)
-        {
-            statement = statement.Remove(1, 1);
-        }
-        if (unlink)
-        {
-            string identifer_ = statement[2..];
-            bool removed = false;
-            foreach (var context in GetCurrentFrame().ScopeStack)
-            {
-                removed = context.Variables.Remove(identifer_);
-                if (removed) return;
-            }
-            if (!removed)
-            {
-                throw new UnknownNameError(identifer_);
-            }
-        }
-        bool init = Utils.StringContains(statement, "=");
-        string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];
+        bool unsetable = LexicalAnalyzer.StatementContainsSyntax(statement, "?");
+        bool readonly_ = LexicalAnalyzer.StatementContainsSyntax(statement, "!");
+        bool init = LexicalAnalyzer.StatementContainsSyntax(statement, "=");
+        string identifier = LexicalAnalyzer.StatementGetFirst(statement, Lexer.LexerStructs.TokenType.DecleareIdentifier);
         if (!Utils.IsIdentifierValid(identifier, true))
         {
             throw new InvalidIdentifierError(identifier);
         }
         if (init)
         {
-            if (statement.EndsWith('='))
-            {
-                throw new UnexpectedEndOfStatementError("Expression");
-            }
-            var initVal = Evaluator.Evaluate(statement[(statement.IndexOf('=') + 1)..]);
+            var initVal = Evaluator.Evaluate(LexicalAnalyzer.StatementGetExpression(statement));
             initVal.flags.unsetable = unsetable;
             initVal.flags.readonly_ = readonly_;
             bool failed = false;
-
             if (!DeclareVar(identifier, initVal))
                 failed = true;
 
@@ -885,86 +831,33 @@ public class Interpreter
 
     }
 
-    public void DeclareStatementNew(CompiledStatement statement)
+    [MarkStatement(StatementId.Unlink)]
+    public void Unlink(CompiledStatement statement)
     {
-        //statement = statement.Replace(":connect","=");
-        bool unsetable = statement
-        bool readonly_ = statement[1] == '!';
-        bool unlink = statement[1] == '$';
-        if (unsetable || readonly_)
+        string identifer_ = LexicalAnalyzer.StatementGetIdentifier(statement);
+        bool removed = false;
+        foreach (var context in GetCurrentFrame().ScopeStack)
         {
-            statement = statement.Remove(1, 1);
+            removed = context.Variables.Remove(identifer_);
+            if (removed) return;
         }
-        if (unlink)
+        if (!removed)
         {
-            string identifer_ = statement[2..];
-            bool removed = false;
-            foreach (var context in GetCurrentFrame().ScopeStack)
-            {
-                removed = context.Variables.Remove(identifer_);
-                if (removed) return;
-            }
-            if (!removed)
-            {
-                throw new UnknownNameError(identifer_);
-            }
+            throw new UnknownNameError(identifer_);
         }
-        bool init = Utils.StringContains(statement, "=");
-        string identifier = init ? statement[1..statement.IndexOf('=')] : statement[1..];
-        if (!Utils.IsIdentifierValid(identifier, true))
-        {
-            throw new InvalidIdentifierError(identifier);
-        }
-        if (init)
-        {
-            if (statement.EndsWith('='))
-            {
-                throw new UnexpectedEndOfStatementError("Expression");
-            }
-            var initVal = Evaluator.Evaluate(statement[(statement.IndexOf('=') + 1)..]);
-            initVal.flags.unsetable = unsetable;
-            initVal.flags.readonly_ = readonly_;
-            bool failed = false;
-
-            if (!DeclareVar(identifier, initVal))
-                failed = true;
-
-            if (failed)
-            {
-                throw new IdentifierAlreadyUsedError(identifier);
-            }
-        }
-        else
-        {
-            if (readonly_)
-            {
-                throw new IlegalDeclarationError("A read-only variable has to be initialized");
-            }
-            if (!DeclareVar(identifier, V_Variable.Construct(DataType.Unset, "unset", new() { unsetable = unsetable })))
-            {
-                throw new IdentifierAlreadyUsedError(identifier);
-            }
-        }
-
+    }
+    [MarkStatement(StatementId.Output)]
+    public void OutputStatement(CompiledStatement statement)
+    {
+        Console.WriteLine(Evaluator.Evaluate(statement).ToString());
     }
 
-    [MarkStatement("#FAIL#", false)]
-    public void DebugFail(string statement)
-    {
-        throw new Exception("MANUAL FAIL TRIGGERED");
-    }
-    [MarkStatement(">", false)]
-    public void OutputStatement(string statement)
-    {
-        Console.WriteLine(Evaluator.Evaluate(statement[1..]).ToString());
-    }
-
-    [MarkStatement("<", false)]
-    public void FuncReturnStatement(string statement)
+    [MarkStatement(StatementId.Return)]
+    public void FuncReturnStatement(CompiledStatement statement)
     {
         if (GetCurrentContext().InAFunc)
         {
-            GetCurrentContext().ReturnValue = Evaluator.Evaluate(statement[1..]);
+            GetCurrentContext().ReturnValue = Evaluator.Evaluate(statement);
         }
         else
         {
@@ -972,23 +865,10 @@ public class Interpreter
         }
     }
 
-    [MarkStatement("if", true, ScopeTypeEnum.ifScope)]
-    public void IfStatement(string statement)
+    [MarkStatement(StatementId.If)]
+    public void IfStatement(CompiledStatement statement)
     {
-        if (statement.Length < 4)
-        {
-            throw new UnexpectedEndOfStatementError("Expression");
-        }
-        if (statement[2] != ' ')
-        {
-            throw new ExpectedTokenError(" ");
-        }
-        if (!statement.EndsWith(" :"))
-        {
-            throw new ExpectedTokenError(" :");
-        }
-        int end = Utils.StringIndexOf(statement, " :");
-        string expression = statement[3..end];
+        string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
         if (result)
@@ -996,49 +876,41 @@ public class Interpreter
             GetCurrentContext().SubsequentFramesIgnore = true;
         }
     }
-    [MarkStatement(":", true, scopeType: ScopeTypeEnum.genericScope)]
-    public void GenericStatementStart(string statement)
+    [MarkStatement(StatementId.StartScope)]
+    public void GenericStatementStart(CompiledStatement statement)
     {
 
     }
-    [MarkStatement("try :", true, scopeType: ScopeTypeEnum.tryScope)]
-    public void TryScopeStartStement(string statement)
+    //TODO: try catch
+    /*[MarkStatement(StatementId.)]
+    public void TryScopeStartStement(CompiledStatement statement))
     {
         GetCurrentContext().InTryScope = true;
     }
     [MarkStatement("catch ", true, scopeType: ScopeTypeEnum.catchScope, true)]
-    public void CatchScopeStartStement(string statement)
+    public void CatchScopeStartStement(CompiledStatement statement))
+    {
+
+    }*/
+    [MarkStatement(StatementId.EndScope)]
+    public void EndScopeStatement(CompiledStatement statement)
     {
 
     }
-    [MarkStatement(";", false, endsScope: true)]
-    public void EndScopeStatement(string statement)
-    {
-
-    }
-    [MarkStatement("exit", false)]
-    public void ExitProgrammStatement(string statement)
+    [MarkStatement(StatementId.Exit)]
+    public void ExitProgrammStatement(CompiledStatement statement)
     {
         Environment.Exit(0);
     }
-    [MarkStatement("else :", true, ScopeTypeEnum.elseScope, true)]
-    public void ElseScopeStatement(string statement)
+    [MarkStatement(StatementId.Else)]
+    public void ElseScopeStatement(CompiledStatement statement)
     {
 
     }
-    [MarkStatement("else if", true, ScopeTypeEnum.elseScope, true)]
-    public void ElseIfScopeStatement(string statement)
+    [MarkStatement(StatementId.ElseIf)]
+    public void ElseIfScopeStatement(CompiledStatement statement)
     {
-        if (statement[7] != ' ')
-        {
-            throw new ExpectedTokenError(" ");
-        }
-        if (!statement.EndsWith(" :"))
-        {
-            throw new ExpectedTokenError(" :");
-        }
-        int end = Utils.StringIndexOf(statement, " :");
-        string expression = statement[7..end];
+        string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
         if (result)
@@ -1047,14 +919,14 @@ public class Interpreter
         }
     }
 
-    [MarkStatement("acquire ", false)]
-    public void AccessStatement(string statement)
+    [MarkStatement(StatementId.Acquire)]
+    public void AccessStatement(CompiledStatement statement)
     {
         if (GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel)
         {
             throw new IlegalStatementContextError("Acquire", GetCurrentContext().ScopeType.ToString()).SetInfo("Acquire statement may only be used at the top level");
         }
-        var file = statement[8..] + ".vort";
+        var file = LexicalAnalyzer.StatementGetIdentifier(statement) + ".vort";
         VFile file_ = new(file);
 
         if (!file_.Exists())
@@ -1069,14 +941,14 @@ public class Interpreter
         CallStack.Pop();
 
     }
-    [MarkStatement("safeacquire ", false)]
-    public void AccessOnceStatement(string statement)
+    [MarkStatement(StatementId.Acquires)]
+    public void AccessOnceStatement(CompiledStatement statement)
     {
         if (GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel)
         {
             throw new IlegalStatementContextError("Safeacquire", GetCurrentContext().ScopeType.ToString()).SetInfo("Safeacquire statement may only be used at the top level");
         }
-        var file = statement[12..] + ".vort";
+        var file = LexicalAnalyzer.StatementGetIdentifier(statement) + ".vort";
         VFile file_ = new(file);
         if (ActiveModules.ContainsKey(file_.GetFileName()[0].ToString().ToUpper() + file_.GetFileName()[1..]))
         {
@@ -1091,10 +963,10 @@ public class Interpreter
         CallStack.Pop();
 
     }
-    [MarkStatement("release ", false)]
-    public void UnloadStatement(string statement)
+    [MarkStatement(StatementId.Release)]
+    public void UnloadStatement(CompiledStatement statement)
     {
-        var file = statement[8..];
+        var file = LexicalAnalyzer.StatementGetIdentifier(statement) + ".vort";
         VContext? value = null;
         try
         {
@@ -1117,11 +989,12 @@ public class Interpreter
         value.Destroy();
     }
 
-    [MarkStatement("#", false)]
-    public void SetDirectiveStatement(string statement)
+    [MarkStatement(StatementId.SetDirective)]
+    public void SetDirectiveStatement(CompiledStatement statement)
     {
-        var directive = statement[1..].Split(' ');
-        if (directive.Length < 2)
+        var directive = LexicalAnalyzer.StatementGetIdentifier(statement);
+        //TODO: fix naming directives
+        /*if (directive.Length < 2)
         {
             if (directive[0][0] == '#')
             {
@@ -1143,9 +1016,9 @@ public class Interpreter
         else if (directive.Length > 2)
         {
             throw new UnexpectedTokenError(directive[2]);
-        }
-        string directiveName = directive[0];
-        string value = directive[1];
+        }*/
+        string directiveName = LexicalAnalyzer.StatementGetIdentifier(statement);
+        string value = LexicalAnalyzer.StatementGetExpression(statement);
         var thing = Directives.GetDirectiveField("DIR_" + directiveName, out var type);
         var value_ = Evaluator.Evaluate(value, Utils.CSharpTypeToVortexType(type));
         var fieldValue = thing.GetValue(null);
@@ -1158,75 +1031,59 @@ public class Interpreter
 
 
     }
-
-    public T CastObject<T>(object input)
+    [MarkStatement(StatementId.Raise)]
+    public void ThrowStatement(CompiledStatement statement)
     {
-        return (T)input;
-    }
-
-    [MarkStatement("raise ", false)]
-    public void ThrowStatement(string statement)
-    {
-        var args = Utils.StringSplit(statement, ' ')[1..];
-        if (args.Length == 2)
+        if (statement.tokens.Length == 2)
         {
-            var type = Evaluator.Evaluate(args[0], DataType.GroupType);
-            var message = Evaluator.Evaluate(args[1], DataType.String);
+            var type = Evaluator.Evaluate(statement.tokens[0].leaf!, DataType.GroupType);
+            var message = Evaluator.Evaluate(statement.tokens[1].leaf!, DataType.String);
             InternalStandartLibrary.ThrowError(type, message.value.ToString());
         }
-        else if (args.Length == 1)
+        else if (statement.tokens.Length == 1)
         {
-            var error = Evaluator.Evaluate(args[0], DataType.Error);
+            var error = Evaluator.Evaluate(statement.tokens[0].leaf!, DataType.Error);
             throw (VortexError)error.value;
-        }
-        else
-        {
-            throw new UnexpectedTokenError(args[2]);
         }
     }
 
-    [MarkStatement("assert ", false)]//assert 5==5   assert 5 8
-    public void AssertStatement(string statement)
+    [MarkStatement(StatementId.Assert)]
+    public void AssertStatement(CompiledStatement statement)
     {
-        var args = Utils.StringSplit(statement, ' ')[1..];
-        if (args.Length == 2)
+        if (statement.tokens.Length == 2)
         {
-            var val1 = Evaluator.Evaluate(args[0], DataType.Any);
-            var val2 = Evaluator.Evaluate(args[1], DataType.Any);
+            var val1 = Evaluator.Evaluate(statement.tokens[0].leaf!, DataType.Any);
+            var val2 = Evaluator.Evaluate(statement.tokens[1].leaf!, DataType.Any);
             var value = val1.ToString() == val2.ToString();
             if (!value)
             {
                 throw new AssertionFailedError(val1.ToString(), val2.ToString());
             }
         }
-        else if (args.Length == 1)
+        else if (statement.tokens.Length == 1)
         {
-            var value = (bool)Evaluator.Evaluate(args[0], DataType.Bool).value;
+            var value = (bool)Evaluator.Evaluate(statement.tokens[0].leaf!, DataType.Bool).value;
             if (!value)
             {
                 throw new AssertionFailedError("true", "false");
             }
 
         }
-        else
-        {
-            throw new UnexpectedTokenError(args[2]);
-        }
     }
 
-    [MarkStatement("class ", true, ScopeTypeEnum.classScope)]
-    public void ClassStatement(string statement)
+    [MarkStatement(StatementId.Class)]
+    public void ClassStatement(CompiledStatement statement)
     {
-        var identifier = "Car"; //TODO: lexer
+        var identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
         GetCurrentContext().Ignore = true;
         GetCurrentContext().SubsequentFramesIgnore = true;
-        GetCurrentContext().Name= identifier;
+        GetCurrentContext().Name = identifier;
     }
 
-    [MarkStatement("while ", true, ScopeTypeEnum.loopScope)]
-    public void WhileStatement(string statement)
+    [MarkStatement(StatementId.While)]
+    public void WhileStatement(CompiledStatement statement)
     {
-        var condition = Utils.StringSplit(statement, ' ')[1];
+        var condition = LexicalAnalyzer.StatementGetExpression(statement);
         GetCurrentContext().LoopCondition = condition;
         if ((bool)Evaluator.Evaluate(condition, DataType.Bool).value == false)
         {
@@ -1235,8 +1092,8 @@ public class Interpreter
         }
 
     }
-    [MarkStatement("break", false)]
-    public void BreakStatement(string statement)
+    [MarkStatement(StatementId.Break)]
+    public void BreakStatement(CompiledStatement statement)
     {
         bool found = false;
         foreach (var context in GetCurrentFrame().ScopeStack)
@@ -1254,11 +1111,6 @@ public class Interpreter
         }
     }
 
-
-    public static T ConvertToGeneric<T>(object obj)
-    {
-        return (T)obj;
-    }
     public static bool ReadVar(string identifier, out V_Variable? val, VContext? context = null, DataType type = DataType.Any)
     {
         Dictionary<string, V_Variable> vars;
@@ -1430,12 +1282,4 @@ public class Interpreter
         CallStack.Push(frame);
         return frame;
     }
-}
-
-enum StatementAttributes
-{
-    beginsWith = 0,
-    mewScope = 1,
-    scopeType = 2,
-    endScope = 3
 }

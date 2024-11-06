@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using VortexScript.Definitions;
+using VortexScript.Lexer;
 using VortexScript.Structs;
 using VortexScript.Vortex;
 namespace VortexScript;
@@ -29,6 +30,9 @@ public class Evaluator
             }
         }
         return result;
+    }
+    public static V_Variable Evaluate(Lexer.LexerStructs.CompiledStatement statement){
+        return Evaluate(LexicalAnalyzer.StatementGetExpression(statement));
     }
     public static string[] operators = [];
 
@@ -201,7 +205,6 @@ public class Evaluator
     public List<Token> ProccessVariables(List<Token> tokens)
     {
         VContext? module = null;
-        string moduleName = "";
         for (int i = 0; i < tokens.Count; i++)
         {
             if (tokens[i].type == TokenType.Variable)

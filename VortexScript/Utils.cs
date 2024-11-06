@@ -301,7 +301,7 @@ class Utils
         return vars;
     }
 
-    public static CustomAttributeTypedArgument GetStatementAttribute(MethodInfo statement, StatementAttributes index)
+    public static CustomAttributeTypedArgument GetStatementAttribute(MethodInfo statement, int index)
     {
         return statement.CustomAttributes.ToList()[0].ConstructorArguments[(int)index];
     }

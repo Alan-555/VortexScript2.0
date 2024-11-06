@@ -1,4 +1,4 @@
-namespace VortexScript.Lexer.Structs;
+namespace VortexScript.Lexer.LexerStructs;
 
 public struct CompiledStatement{
     public StatementId id;
