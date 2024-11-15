@@ -10,7 +10,7 @@ public class VContext
     public ScopeTypeEnum ScopeType { private set; get; } //Type of the scope
     public bool Ignore { set; get; } //When true, code will not be executed. Scopes won't be ignored
     public int StartLine { private set; get; } //The line that this scope was started at
-    public bool SubsequentFramesIgnore { set; get; } //When true, all subsequent frames in the stack will inhirit ignore flag and this flag, no matter the actual condition
+    public bool IgnoreOtherIfScopes { set; get; } //When true, all subsequent frames and contextes in the stack will inhirit ignore flag and this flag, no matter the actual condition
     public bool InTryScope { set; get; } = false;
     public VortexError? ErrorRaised { set; get; } = null;
     public VFunc? FuncBeingRead { set; get; } = null;
@@ -27,7 +27,6 @@ public class VContext
         ScopeType = scopeType;
         Ignore = ignore;
         this.StartLine = StartLine;
-        SubsequentFramesIgnore = false;
         File = file;
     }
 

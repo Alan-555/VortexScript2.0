@@ -106,15 +106,15 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             .Expect(TokenType.Expression)
             .Expect(TokenType.StartScope),
 
-            //else
-            new StatementType(StatementId.Else, "else", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.elseScope, true)
-            .Expect("else")
-            .Expect(TokenType.StartScope),
-
             //else if
             new StatementType(StatementId.ElseIf, "else if", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.ifScope, true)
             .Expect("else if")
             .Expect(TokenType.Expression)
+            .Expect(TokenType.StartScope),
+
+            //else
+            new StatementType(StatementId.Else, "else", true, [ScopeTypeEnum.ifScope], ScopeTypeEnum.elseScope, true)
+            .Expect("else")
             .Expect(TokenType.StartScope),
 
             //end scope

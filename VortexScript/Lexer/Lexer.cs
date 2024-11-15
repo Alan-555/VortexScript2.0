@@ -192,6 +192,7 @@ public class LexicalAnalyzer
         bool satisfied = false;
         bool wasDot = false;
         bool inBrackedExpression = false;
+        bool inString = false;
         int lastDot = 0;
         while (i < value.Length - 1)
         {
@@ -216,9 +217,13 @@ public class LexicalAnalyzer
                     break;
                 case LexerStructs.TokenType.Expression:
                     satisfied = true;
+                    if (build[^1] == '\"'){
+                        if(inString) goto ret;
+                        else inString = true;
+                    }
                     if (!inBrackedExpression && build == "(") inBrackedExpression = true;
                     if (inBrackedExpression && build[^1] == ')') goto ret;
-                    if(!inBrackedExpression && build[^1]==' ') goto ret;
+                    if(!inBrackedExpression && build[^1]==' ' && !inString) goto ret;
                     break;
                 case LexerStructs.TokenType.StartScope:
                     if (build == ":") { satisfied = true; i++;goto ret; }

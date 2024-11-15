@@ -181,7 +181,6 @@ public class Interpreter
                 {
                     GetCurrentContext().ErrorRaised = e;
                     GetCurrentContext().Ignore = true;
-                    GetCurrentContext().SubsequentFramesIgnore = true;
                 }
                 else
                 {
@@ -266,42 +265,23 @@ public class Interpreter
             {
                 if (statement.id == StatementId.Else)
                 {
-                    var context = GetCurrentContext();
-                    if (context.ScopeType != ScopeTypeEnum.ifScope)
-                    {
-                        throw new IlegalStatementContextError("else", context.ScopeType.ToString());
+                    var context = CloseContext();
+                    OpenNewContext(ScopeTypeEnum.elseScope,context);
+                    if(context.IgnoreOtherIfScopes){
+                        
                     }
-                    CloseContext();
-                    OpenNewContext(ScopeTypeEnum.elseScope);
-                    GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
-                    GetCurrentContext().InTryScope = context.InTryScope;
-                    if (context.SubsequentFramesIgnore)
-                    {
-                        GetCurrentContext().Ignore = true;
-                        GetCurrentContext().SubsequentFramesIgnore = true;
+                    else if(context.){
+
                     }
-                    else
-                        GetCurrentContext().Ignore = !context.Ignore;
                 }
                 else if (statement.id == StatementId.ElseIf)
                 {
                     var context = GetCurrentContext();
-                    if (context.ScopeType != ScopeTypeEnum.ifScope)
-                    {
-                        throw new IlegalStatementContextError("else if", context.ScopeType.ToString());
-                    }
                     CloseContext();
                     OpenNewContext(ScopeTypeEnum.ifScope);
                     GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
                     GetCurrentContext().InTryScope = context.InTryScope;
                     GetCurrentContext().InAFunc = context.InAFunc;
-                    if (context.SubsequentFramesIgnore)
-                    {
-                        GetCurrentContext().Ignore = true;
-                        GetCurrentContext().SubsequentFramesIgnore = true;
-                    }
-                    else
-                        GetCurrentContext().Ignore = !context.Ignore;
                 }//TODO: catch
                 /*else if (statement.id == StatementId.Catch)
                 {
@@ -374,12 +354,10 @@ public class Interpreter
                 {
                     GetCurrentContext().ErrorRaised = context.ErrorRaised;
                     GetCurrentContext().Ignore = true;
-                    GetCurrentContext().SubsequentFramesIgnore = true;
                 }
                 if (context.ScopeType == ScopeTypeEnum.catchScope && !context.Ignore)
                 {
                     GetCurrentContext().Ignore = true;
-                    GetCurrentContext().SubsequentFramesIgnore = true;
                     GetCurrentContext().ErrorRaised = null;
                 }
                 if (context.ScopeType == ScopeTypeEnum.loopScope && !context.Ignore)
@@ -414,10 +392,6 @@ public class Interpreter
                 GetCurrentContext().FuncBeingRead = prevContext.FuncBeingRead;
                 GetCurrentContext().InAFunc = prevContext.InAFunc;
                 GetCurrentContext().InTryScope = prevContext.InTryScope;
-                if (prevContext.Ignore)
-                {
-                    GetCurrentContext().SubsequentFramesIgnore = true;
-                }
             }
             if (!GetCurrentContext().Ignore)
                 statementToExec.Invoke(this, [statement]);
@@ -435,26 +409,35 @@ public class Interpreter
         }
     }
 
-    public VContext OpenNewContext(ScopeTypeEnum type)
+    public static VContext OpenNewContext(ScopeTypeEnum type)
     {
-
         var newC = new VContext([], null, GetCurrentFrame().ScopeStack.Count, type, StartLine: GetCurrentFrame().currentLine);
         GetCurrentFrame().ScopeStack.Push(newC);
         return newC;
     }
-    public void CloseContext()
+    public static VContext OpenNewContext(ScopeTypeEnum type,VContext old)
     {
-        if (GetCurrentContext().FuncBeingRead != null && GetCurrentContext().FuncTopLevel)
+        var newC = OpenNewContext(type);
+        newC.Ignore = old.Ignore;
+        newC.InTryScope = old.InTryScope;
+        newC.IgnoreOtherIfScopes = old.IgnoreOtherIfScopes;
+        newC.InAFunc = old.InAFunc;
+        return newC;
+    }
+    public VContext CloseContext()
+    {
+        //TODO: funcs
+        /*if (GetCurrentContext().FuncBeingRead != null && GetCurrentContext().FuncTopLevel)
         {
             FinishFuncDeclaration();
         }
-        else
+        else*/
         {
             if (GetCurrentContext().ScopeType == ScopeTypeEnum.topLevel)
             {
                 throw new UnexpectedTokenError(";").SetInfo("Top level statement may not be closed. Use exit instead");
             }
-            GetCurrentFrame().ScopeStack.Pop();
+            return GetCurrentFrame().ScopeStack.Pop();
 
         }
     }
@@ -476,6 +459,7 @@ public class Interpreter
         }
         return GetCurrentFrame().ScopeStack.First();
     }
+
     public bool AssignStatement(string statement)
     {
         if (Utils.StringContains(statement, "="))
@@ -616,7 +600,6 @@ public class Interpreter
             }
             var c = OpenNewContext(ScopeTypeEnum.functionScope);
             c.Ignore = true;
-            c.SubsequentFramesIgnore = true;
             c.FuncBeingRead = func;
             c.FuncTopLevel = true;
             return true;
@@ -871,10 +854,6 @@ public class Interpreter
         string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
-        if (result)
-        {
-            GetCurrentContext().SubsequentFramesIgnore = true;
-        }
     }
     [MarkStatement(StatementId.StartScope)]
     public void GenericStatementStart(CompiledStatement statement)
@@ -913,10 +892,6 @@ public class Interpreter
         string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
-        if (result)
-        {
-            GetCurrentContext().SubsequentFramesIgnore = true;
-        }
     }
 
     [MarkStatement(StatementId.Acquire)]
@@ -1076,7 +1051,6 @@ public class Interpreter
     {
         var identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
         GetCurrentContext().Ignore = true;
-        GetCurrentContext().SubsequentFramesIgnore = true;
         GetCurrentContext().Name = identifier;
     }
 
@@ -1087,7 +1061,6 @@ public class Interpreter
         GetCurrentContext().LoopCondition = condition;
         if ((bool)Evaluator.Evaluate(condition, DataType.Bool).value == false)
         {
-            GetCurrentContext().SubsequentFramesIgnore = true;
             GetCurrentContext().Ignore = true;
         }
 
@@ -1099,7 +1072,6 @@ public class Interpreter
         foreach (var context in GetCurrentFrame().ScopeStack)
         {
             context.Ignore = true;
-            context.SubsequentFramesIgnore = true;
             if (context.ScopeType == ScopeTypeEnum.loopScope)
             {
                 found = true;
