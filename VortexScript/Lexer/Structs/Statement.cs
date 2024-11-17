@@ -37,6 +37,12 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
         Add(new(TokenType.Syntax, val), GroupRule.GroupAny, false, mandatory);
         return this;
     }
+    public StatementType ExpectOneOf(string[] vals, bool mandatory = true)
+    {
+        foreach (string val in vals)
+            Add(new(TokenType.Syntax, val), GroupRule.GroupAny,true, mandatory);
+        return this;
+    }
     public StatementType ExpectAfter(string val, bool mandatory = true)
     {
         Add(new(TokenType.Syntax, val), GroupRule.GroupAny, true, mandatory);
@@ -97,8 +103,8 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
 
             //return
             new StatementType(StatementId.Return, "<", false, [ScopeTypeEnum.functionScope])
-            .Expect("<")
-            .Expect(TokenType.Expression),
+            .Expect("<")//TODO: check if return type is set to none
+            .Expect(TokenType.Expression,false),
 
             //if
             new StatementType(StatementId.If, "if", true, [], ScopeTypeEnum.ifScope)
@@ -122,7 +128,7 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             .Expect(";"),
 
             //start scope
-            new StatementType(StatementId.StartScope, ":", false, [], ScopeTypeEnum.genericScope)
+            new StatementType(StatementId.StartScope, ":", true, [], ScopeTypeEnum.genericScope)
             .Expect(":"),
 
             //exit
@@ -186,12 +192,15 @@ public class StatementType(StatementId id, string StartsWith, bool StartsNewScop
             //declare function
             new StatementType(StatementId.DeclareFunction, "", false)
             .Expect(TokenType.DecleareIdentifier)
-            .ExpectAfter(TokenType.Args)
+            .ExpectAfter(TokenType.FuncDeclareArgs)
             .Expect(TokenType.StartScope),
 
             //assignment
             new StatementType(StatementId.Assignment, "", false)
             .Expect(TokenType.Identifier)
+            .StartGroup(GroupRule.GroupExactlyOne,false,false)
+            .ExpectOneOf(["+","-","*","/","."])
+            .EndGroup()
             .Expect("=")
             .Expect(TokenType.Expression),
 
@@ -295,6 +304,7 @@ public enum TokenType
     EndScope,
     Syntax,
     Args,
+    FuncDeclareArgs,
 }
 public enum GroupRule
 {

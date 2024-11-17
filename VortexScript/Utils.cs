@@ -251,10 +251,8 @@ class Utils
         result.Add(currentString.ToString());
         return result.ToArray();
     }
-
-    public static VArray? ArgsEval(string input, char delimiter, DataType[]? dataTypes = null, DataType? oneType = null)
+    public static VArray? ArgsEval(string[] argsArray, DataType[]? dataTypes = null, DataType? oneType = null)
     {
-        var argsArray = StringSplit(input, delimiter);
         if (argsArray.Length == 1 && argsArray[0] == "")
         {
             argsArray = [];
@@ -285,6 +283,12 @@ class Utils
         return ret;
     }
 
+    public static VArray? ArgsEval(string input, char delimiter, DataType[]? dataTypes = null, DataType? oneType = null)
+    {
+        var argsArray = StringSplit(input, delimiter);
+        return ArgsEval(argsArray,dataTypes,oneType);
+    }
+
     public static Dictionary<string, V_Variable> GetAllVars()
     {
         Dictionary<string, V_Variable> vars = [];
@@ -309,12 +313,14 @@ class Utils
     {
         return statement.CustomAttributes.ToList().Find(x => x.AttributeType == typeof(T)).ConstructorArguments[index];
     }
-    public static bool IsIdentifierValid(string identifier,bool declaring = false)
+    public static bool IsIdentifierValid(string identifier,bool declaring = false,bool autoThrow = false)
     {
         if (declaring&&Interpreter.keywords.Contains(identifier)) return false;
         string pattern = @"^[a-zA-Z_🌋][a-zA-Z0-9_🌀🌋]*$";
         Regex regex = new(pattern);
-        return regex.IsMatch(identifier);
+        bool res = regex.IsMatch(identifier);
+        if(!res&&autoThrow) throw new Definitions.InvalidIdentifierError(identifier);
+        return res;
     }
 
     public static VFuncArg[] ConvertMethodInfoToArgs(MethodInfo method)

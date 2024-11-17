@@ -10,11 +10,10 @@ public class VContext
     public ScopeTypeEnum ScopeType { private set; get; } //Type of the scope
     public bool Ignore { set; get; } //When true, code will not be executed. Scopes won't be ignored
     public int StartLine { private set; get; } //The line that this scope was started at
-    public bool IgnoreOtherIfScopes { set; get; } //When true, all subsequent frames and contextes in the stack will inhirit ignore flag and this flag, no matter the actual condition
+    public IfState IfState { set; get; } = IfState.passed;
     public bool InTryScope { set; get; } = false;
     public VortexError? ErrorRaised { set; get; } = null;
     public VFunc? FuncBeingRead { set; get; } = null;
-    public bool FuncTopLevel { set; get; } = false;
     public V_Variable? ReturnValue { set; get; } = null;
     public bool InAFunc { get; set; } = false;
     public bool IsMain { get; set; } = false;
@@ -70,4 +69,13 @@ public enum ScopeTypeEnum
     loopScope = 7,
     classScope = 8,
     internal_ = -1,
+}
+
+
+public enum IfState
+{
+    failed,
+    deadBranch,
+    passed,
+
 }

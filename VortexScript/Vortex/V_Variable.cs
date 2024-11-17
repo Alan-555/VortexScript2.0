@@ -55,6 +55,11 @@ public abstract class V_Variable
     {
         return Construct(type, value, flags).value;
     }
+    public void Assign(V_Variable new_,string ident = ""){
+        if(flags.readonly_) throw new AssigmentToReadonlyVarError(ident);
+        type = new_.type;
+        value = new_.value;
+    }
     protected V_Variable(DataType type, object? value, V_VarFlags flags)
     {
 
@@ -553,6 +558,9 @@ public class VType_Function : V_Variable
     public override string ToString()
     {
         return value.ToString()!;
+    }
+    override public VFunc GetCallableFunc(params object[] args){
+        return (value as VFunc)!;
     }
 }
 

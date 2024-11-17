@@ -1,3 +1,5 @@
+using VortexScript.Vortex;
+
 namespace VortexScript.Lexer.LexerStructs;
 
 public struct CompiledStatement{
@@ -13,6 +15,7 @@ public struct CompiledStatement{
 public struct CompiledToken{
     public string? leaf;
     public string[]? branch;
+    public Dictionary<string,string>? FuncArgs;
     public TokenType type;
 
     public CompiledToken(TokenType type, string value){
@@ -26,5 +29,9 @@ public struct CompiledToken{
     public CompiledToken(string[] values,bool identifer){
         branch = values;
         type = TokenType.Identifier;
+    }
+    public CompiledToken(Dictionary<string,string> funcArgs){
+        FuncArgs = funcArgs;
+        type = TokenType.FuncDeclareArgs;
     }
 }

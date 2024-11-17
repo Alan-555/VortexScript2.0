@@ -1,7 +1,5 @@
-if 3==4 :
-    > "a"
-else if 3==3 :
-    > "b"
-else :
-    > "c"
+add(Number a, Number b) :
+    < a + b
 ;
+
+> add(5,10)

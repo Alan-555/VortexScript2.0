@@ -89,7 +89,7 @@ public class LexicalAnalyzer
                     }
                 }
                 //find the end of the current token
-                int end = GetTokenEnd(token.tokenType, current, token.value);
+                int end = GetTokenEnd(token.tokenType, current, token.value,item==type.statementStruct.Last()&&token==item.tokens.Last());
                 //if end exists
                 if (end != -1)
                 {
@@ -102,7 +102,29 @@ public class LexicalAnalyzer
                     }
                     else if (token.tokenType == LexerStructs.TokenType.Identifier)
                     {
-                        ret.Add(new(Utils.StringSplit(current[0..end], '.'), true));
+                        ret.Add(new(LexerStructs.TokenType.Identifier,current[..end]));
+                    }
+                    else if (token.tokenType == LexerStructs.TokenType.FuncDeclareArgs)
+                    {
+                        var arr = Utils.StringSplit(current[1..(end - 1)],',');
+                        var dict = new Dictionary<string, string>();
+                        for(int ii = 0; ii < arr.Length; ii++){
+                            var arr_ = arr[ii].Split(' ');
+                            if(arr_.Length == 1){
+                                Utils.IsIdentifierValid(arr_[ii],true,true);
+                                if(dict.ContainsKey(arr_[ii]))
+                                    throw new DuplicateVariableError(arr_[ii]);
+                                dict.Add(arr_[ii],"Any");
+
+                            }
+                            else{
+                                Utils.IsIdentifierValid(arr_[ii+1],true,true);
+                                if(dict.ContainsKey(arr_[ii+1]))
+                                    throw new DuplicateVariableError(arr_[ii+1]);
+                                dict.Add(arr_[ii+1],arr_[ii]);
+                            }
+                        }
+                        ret.Add(new(dict));
                     }
                     else
                     {
@@ -185,7 +207,7 @@ public class LexicalAnalyzer
         return new(type.Id,[.. ret]);
     }
 
-    public static int GetTokenEnd(LexerStructs.TokenType type, string value, string expectedSyntax = "")
+    public static int GetTokenEnd(LexerStructs.TokenType type, string value, string expectedSyntax = "",bool allowExpressionSpaces = false)
     {
         int i = -1;
         string build = "";
@@ -223,7 +245,7 @@ public class LexicalAnalyzer
                     }
                     if (!inBrackedExpression && build == "(") inBrackedExpression = true;
                     if (inBrackedExpression && build[^1] == ')') goto ret;
-                    if(!inBrackedExpression && build[^1]==' ' && !inString) goto ret;
+                    if(!inBrackedExpression && build[^1]==' ' && !inString && !allowExpressionSpaces) goto ret;
                     break;
                 case LexerStructs.TokenType.StartScope:
                     if (build == ":") { satisfied = true; i++;goto ret; }
@@ -241,6 +263,10 @@ public class LexicalAnalyzer
                 case LexerStructs.TokenType.Args:
                     if (value[0] != '(') return -1;
                     return Utils.StringGetMatchingPer(value) + 1;
+                case LexerStructs.TokenType.FuncDeclareArgs:
+                if (value[0] != '(') return -1;
+                    return Utils.StringGetMatchingPer(value) + 1;
+
             }
         }
         if (type == LexerStructs.TokenType.Syntax)
@@ -266,8 +292,25 @@ public class LexicalAnalyzer
     public static string StatementGetIdentifier(CompiledStatement statement){
         return StatementGetFirst(statement, LexerStructs.TokenType.Identifier);
     }
+    public static string StatementGetDeclareIdentifier(CompiledStatement statement){
+        return StatementGetFirst(statement, LexerStructs.TokenType.DecleareIdentifier);
+    }
     public static string StatementGetExpression(CompiledStatement statement){
         return StatementGetFirst(statement, LexerStructs.TokenType.Expression);
+    }
+    public static string[] StatementGetArgs(CompiledStatement statement){
+        foreach (var item in statement.tokens)
+        {
+            if(item.type == LexerStructs.TokenType.Args) return item.branch!;
+        }
+        throw new Exception("Lexical analysis error: Args not found in statement");
+    }
+    public static Dictionary<string,string> StatementGetFuncDeclareArgs(CompiledStatement statement){
+        foreach (var item in statement.tokens)
+        {
+            if(item.type == LexerStructs.TokenType.FuncDeclareArgs) return item.FuncArgs!;
+        }
+        throw new Exception("Lexical analysis error: Args not found in statement");
     }
     public static string StatementGetFirst(CompiledStatement statement, LexerStructs.TokenType type){
         foreach (var item in statement.tokens)

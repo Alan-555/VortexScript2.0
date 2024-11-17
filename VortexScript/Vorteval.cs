@@ -31,7 +31,8 @@ public class Evaluator
         }
         return result;
     }
-    public static V_Variable Evaluate(Lexer.LexerStructs.CompiledStatement statement){
+    public static V_Variable Evaluate(Lexer.LexerStructs.CompiledStatement statement)
+    {
         return Evaluate(LexicalAnalyzer.StatementGetExpression(statement));
     }
     public static string[] operators = [];
@@ -236,28 +237,20 @@ public class Evaluator
             }
             else if (tokens[i].type == TokenType.Function)
             {
-                Interpreter.CallFunctionStatement(tokens[i].value, out var res, module);
-                if (module != null)
-                    tokens[i - 1] = new(TokenType.Ignore, "");
-                if (res == null)
-                {
-                    tokens[i] = new(TokenType.Unset, "unset");
-                }
-                else
-                {
-                    tokens[i] = new(DataTypeToTokenType(res.type), res.ToString(), res.value);
-                }
-                module = null;
+                var statement = LexicalAnalyzer.TokenizeStatement(tokens[i].value);
+                var result = Interpreter.CallFunctionStatement(statement);
+                tokens[i] = new(DataTypeToTokenType(result.type),"",result.value);
             }
             else if (tokens[i].type == TokenType.Module && tokens[i].isDot)
             {
-                if(i==tokens.Count-1){
+                if (i == tokens.Count - 1)
+                {
                     throw new ExpectedTokenError("identifier");
                 }
-                var dotable = tokens[i].actualValue==null ? Evaluator.Evaluate(tokens[i].value) : tokens[i].GetValVar();
+                var dotable = tokens[i].actualValue == null ? Evaluator.Evaluate(tokens[i].value) : tokens[i].GetValVar();
                 var other = dotable.GetField(tokens[i + 1].value);
                 tokens[i] = new(TokenType.Ignore, "");
-                tokens[i + 1] = new(DataTypeToTokenType(other.type), other.ToString(), other.value){isDot = tokens[i + 1].isDot};
+                tokens[i + 1] = new(DataTypeToTokenType(other.type), other.ToString(), other.value) { isDot = tokens[i + 1].isDot };
 
             }
             else if (tokens[i].type == TokenType.Array)

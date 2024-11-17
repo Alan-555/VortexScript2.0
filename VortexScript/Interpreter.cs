@@ -266,22 +266,30 @@ public class Interpreter
                 if (statement.id == StatementId.Else)
                 {
                     var context = CloseContext();
-                    OpenNewContext(ScopeTypeEnum.elseScope,context);
-                    if(context.IgnoreOtherIfScopes){
-                        
+                    OpenNewContext(ScopeTypeEnum.elseScope, context);
+                    if (context.Ignore && context.IfState == IfState.failed)
+                    {
+                        GetCurrentContext().IfState = IfState.passed;
+                        GetCurrentContext().Ignore = false;
                     }
-                    else if(context.){
-
+                    else
+                    {
+                        GetCurrentContext().Ignore = true;
                     }
                 }
                 else if (statement.id == StatementId.ElseIf)
                 {
-                    var context = GetCurrentContext();
-                    CloseContext();
-                    OpenNewContext(ScopeTypeEnum.ifScope);
-                    GetCurrentContext().FuncBeingRead = context.FuncBeingRead;
-                    GetCurrentContext().InTryScope = context.InTryScope;
-                    GetCurrentContext().InAFunc = context.InAFunc;
+                    var context = CloseContext();
+                    OpenNewContext(ScopeTypeEnum.ifScope, context);
+                    if (context.Ignore && context.IfState == IfState.failed)
+                    {
+                        GetCurrentContext().Ignore = false;
+                    }
+                    else
+                    {
+                        GetCurrentContext().Ignore = true;
+                    }
+
                 }//TODO: catch
                 /*else if (statement.id == StatementId.Catch)
                 {
@@ -370,14 +378,18 @@ public class Interpreter
                 if (context.ScopeType == ScopeTypeEnum.classScope)
                 {
                     var class_ = new VClass(context.Name, context.File!);
-                    if (!Utils.IsIdentifierValid(class_.Identifier))
-                    {
-                        throw new InvalidIdentifierError(class_.Identifier);
-                    }
                     var var = V_Variable.Construct(DataType.Class, class_);
                     if (!DeclareVar(class_.Identifier, var))
                     {
                         throw new IdentifierAlreadyUsedError(class_.Identifier);
+                    }
+                }
+                if (context.ScopeType == ScopeTypeEnum.functionScope)
+                {
+                    func!.FunctionBody = func.FunctionBody[..^1];
+                    if (!DefineFunc(func.Identifier, func))
+                    {
+                        throw new IdentifierAlreadyUsedError(func.Identifier);
                     }
                 }
             }
@@ -385,13 +397,7 @@ public class Interpreter
             if (startsScope)
             {
                 var prevContext = GetCurrentContext();
-                OpenNewContext(statementType.ScopeType);
-                //inhirit igonre flag
-                GetCurrentContext().Ignore = prevContext.Ignore;
-                //inhirit function
-                GetCurrentContext().FuncBeingRead = prevContext.FuncBeingRead;
-                GetCurrentContext().InAFunc = prevContext.InAFunc;
-                GetCurrentContext().InTryScope = prevContext.InTryScope;
+                OpenNewContext(statementType.ScopeType, prevContext);
             }
             if (!GetCurrentContext().Ignore)
                 statementToExec.Invoke(this, [statement]);
@@ -415,31 +421,27 @@ public class Interpreter
         GetCurrentFrame().ScopeStack.Push(newC);
         return newC;
     }
-    public static VContext OpenNewContext(ScopeTypeEnum type,VContext old)
+    public static VContext OpenNewContext(ScopeTypeEnum type, VContext old)
     {
+        var enclosingContext = GetCurrentContext();
         var newC = OpenNewContext(type);
         newC.Ignore = old.Ignore;
         newC.InTryScope = old.InTryScope;
-        newC.IgnoreOtherIfScopes = old.IgnoreOtherIfScopes;
+        newC.IfState = old.IfState;
         newC.InAFunc = old.InAFunc;
+        if (enclosingContext.IfState == IfState.failed)
+        {
+            newC.IfState = IfState.deadBranch;
+        }
         return newC;
     }
     public VContext CloseContext()
     {
-        //TODO: funcs
-        /*if (GetCurrentContext().FuncBeingRead != null && GetCurrentContext().FuncTopLevel)
+        if (GetCurrentContext().ScopeType == ScopeTypeEnum.topLevel)
         {
-            FinishFuncDeclaration();
+            throw new UnexpectedTokenError(";").SetInfo("Top level statement may not be closed. Use exit instead");
         }
-        else*/
-        {
-            if (GetCurrentContext().ScopeType == ScopeTypeEnum.topLevel)
-            {
-                throw new UnexpectedTokenError(";").SetInfo("Top level statement may not be closed. Use exit instead");
-            }
-            return GetCurrentFrame().ScopeStack.Pop();
-
-        }
+        return GetCurrentFrame().ScopeStack.Pop();
     }
 
 
@@ -460,247 +462,76 @@ public class Interpreter
         return GetCurrentFrame().ScopeStack.First();
     }
 
-    public bool AssignStatement(string statement)
+    [MarkStatement(StatementId.Assignment)]
+    public void AssignStatement(CompiledStatement statement)
     {
-        if (Utils.StringContains(statement, "="))
+        string identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
+        if (!ReadVar(identifier, out var theVar)) throw new UnknownNameError(identifier);
+        string special = LexicalAnalyzer.StatementGetFirst(statement, Lexer.LexerStructs.TokenType.Syntax);
+        var eval = Evaluator.Evaluate(statement);
+        if (special != "=")
         {
-            if (statement.Length == 1)
-            {
-                throw new ExpectedTokenError("identifier");
-            }
-            var middle = Utils.StringIndexOf(statement, "=");
-            if (middle < 1)
-            {
-                throw new UnexpectedTokenError("=").SetInfo("Identifier expected prior");
-
-            }
-            string identifier = "";
-            VContext module = null!;
-            int i = 0;
-            while (Evaluator.identifierValidChars.Contains(statement[i]) || statement[i] == '.')
-            {
-                if (statement[i] == '.')
-                {
-                    module = (VContext)Evaluator.Evaluate(identifier, DataType.Module).value;
-                    identifier = "";
-                    i++;
-                    continue;
-                }
-                identifier += statement[i];
-                i++;
-            }
-            string special = statement[i..middle].Trim();
-            if (middle + 1 == statement.Length && special != ".")
-            {
-                throw new UnexpectedEndOfStatementError("Expression");
-            }
-            string expression = statement[(middle + 1)..];
-            if (special == "." && expression.Trim() != "")
-            {
-                throw new UnexpectedTokenError(expression);
-            }
-            if (Utils.IsIdentifierValid(identifier))
-            {
-                if (!ReadVar(identifier, out var var, module))
-                {
-                    throw new UnknownNameError(identifier);
-                }
-                if (var!.flags.readonly_)
-                {
-                    throw new AssigmentToReadonlyVarError(identifier);
-                }
-
-                if (OperToSpecialAssigment.TryGetValue(special, out var spec))
-                {
-                    if (spec.Name == nameof(V_Variable.SpecialClear))
-                    {
-                        spec.Invoke(var, [null]);
-                        return true;
-                    }
-                    spec.Invoke(var, [Evaluator.Evaluate(expression)]);
-                    return true;
-                }
-                SetVar(identifier, Evaluator.Evaluate(expression), module);
-                return true;
-            }
+            OperToSpecialAssigment[special].Invoke(theVar, [eval]);
         }
-        return false;
+        else
+            theVar!.Assign(eval, identifier);
     }
-    public bool FuncDeclaration(string statement)
+    [MarkStatement(StatementId.DeclareFunction)]
+    public void FuncDeclaration(CompiledStatement statement)
     {
-
-        if (Utils.StringContains(statement, "(") && Utils.StringContains(statement, ")") && statement.EndsWith(" :"))
+        if (GetCurrentContext().FuncBeingRead != null || GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel && GetCurrentContext().ScopeType != ScopeTypeEnum.classScope)
         {
-            if (GetCurrentContext().FuncBeingRead != null || GetCurrentContext().ScopeType != ScopeTypeEnum.topLevel && GetCurrentContext().ScopeType != ScopeTypeEnum.classScope)
-            {
-                throw new IlegalContextDeclarationError("function").SetInfo("Functions may only be declared at the top level");
-            }
-            int argsStart = Utils.StringIndexOf(statement, "(");
-            int argsEnd = Utils.StringIndexOf(statement, ")");
-            if (argsStart == 0)
-            {
-                throw new UnexpectedTokenError("(").SetInfo("Identifier expected prior");
-            }
-            else if (argsStart == -1)
-            {
-                throw new ExpectedTokenError("(");
-            }
-            if (argsEnd == -1)
-            {
-                throw new ExpectedTokenError(")");
-            }
-            string identifier = statement[0..statement.IndexOf('(')];
-            if (!Utils.IsIdentifierValid(identifier, true))
-            {
-                throw new InvalidIdentifierError(identifier);
-            }
-            string args = statement[(argsStart + 1)..argsEnd];
-            var argsArray = args.Split(',');
-            if (argsArray.Length == 1 && argsArray[0] == "")
-            {
-                argsArray = [];
-            }
-            List<VFuncArg> argsList = new List<VFuncArg>();
-            foreach (var arg_ in argsArray)
-            {
-                var ident = arg_.Trim();
-                var index = Utils.StringIndexOf(ident, " ");
-                DataType? type = null;
-                if (index != -1)
-                {
-                    type = (DataType)Evaluator.Evaluate(ident[..index], DataType.Type).value;
-                    ident = ident[(index + 1)..];
-                }
-                if (!Utils.IsIdentifierValid(ident, true))
-                {
-                    throw new InvalidIdentifierError(ident);
-                }
-                if (argsList.Any(x => x.name == ident))
-                {
-                    throw new DuplicateVariableError(ident);
-                }
-                if (type.HasValue)
-                {
-                    argsList.Add(new(ident) { enforcedType = (DataType)type });
-                }
-                else
-                {
-                    argsList.Add(new(ident));
-                }
-            }
-            VFunc func = new(identifier, File, [.. argsList], GetCurrentFrame().currentLine);
-            if (GetCurrentContext().ScopeType == ScopeTypeEnum.classScope)
-            {
-                if (GetCurrentContext().Name == identifier)
-                { //constructor
-                    GetCurrentTopLevelContext().Variables.Remove(identifier);
-                    func.IsConstructor = true;
-
-                }
-            }
-            var c = OpenNewContext(ScopeTypeEnum.functionScope);
-            c.Ignore = true;
-            c.FuncBeingRead = func;
-            c.FuncTopLevel = true;
-            return true;
+            throw new IlegalContextDeclarationError("function").SetInfo("Functions may only be declared at the top level");
         }
-        return false;
+        string identifier = LexicalAnalyzer.StatementGetDeclareIdentifier(statement);
+        Dictionary<string, string> argsArray = LexicalAnalyzer.StatementGetFuncDeclareArgs(statement);
+        List<VFuncArg> argsList = [];
+        foreach (var arg_ in argsArray)
+        {
+            var ident = arg_.Key;
+            DataType type = (DataType)Evaluator.Evaluate(arg_.Value, DataType.Type).value;
+            argsList.Add(new(ident) { enforcedType = type });
+
+        }
+        VFunc func = new(identifier, File, [.. argsList], GetCurrentFrame().currentLine);
+        if (GetCurrentContext().ScopeType == ScopeTypeEnum.classScope)
+        {
+            if (GetCurrentContext().Name == identifier)
+            { //constructor
+                func.IsConstructor = true;
+            }
+        }
+        var c = OpenNewContext(ScopeTypeEnum.functionScope);
+        c.Ignore = true;
+        c.FuncBeingRead = func;
     }
-    public void FinishFuncDeclaration()
+    [MarkStatement(StatementId.Call)]
+    public static V_Variable CallFunctionStatement(CompiledStatement statement)
     {
-        var func = GetCurrentContext().FuncBeingRead;
-        func!.FunctionBody = func.FunctionBody[..^1];
-        GetCurrentFrame().ScopeStack.Pop();
-        if (!DefineFunc(func.Identifier, func))
-        {
-            throw new IdentifierAlreadyUsedError(func.Identifier);
+        string identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
+        if(!ReadVar(identifier,out var callable)) throw new UnknownNameError(identifier);
+        var func = callable!.GetCallableFunc() ?? throw new IlegalOperationError("The type '"+callable.type+"' is not callable");
+        string[] args = LexicalAnalyzer.StatementGetArgs(statement);
+        var argsArray = Utils.ArgsEval(args, func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, args.Length.ToString());
+        if (argsArray.Count != func.Args.Length)
+        {//TODO: defualt params
+            throw new FuncOverloadNotFoundError(func.Identifier, argsArray.Count.ToString());
         }
-
-    }
-    public static bool CallFunctionStatement(string statement, out V_Variable? val, VContext? context = null)
-    {
-        if (Utils.StringContains(statement, "(") && Utils.StringContains(statement, ")") && !statement.EndsWith(" :"))
+        Dictionary<string, V_Variable> argsList = [];
+        int i = 0;
+        foreach (var arg in argsArray)
         {
-            int argsStart = Utils.StringIndexOf(statement, "(");
-            int argsEnd = Utils.StringLastIndexOf(statement, ')');
-            if (argsEnd != statement.Length - 1)
-            {
-                throw new UnexpectedTokenError(statement[(argsEnd + 1)..]);
-            }
-            if (argsStart == 0)
-            {
-                throw new UnexpectedTokenError("=").SetInfo("Function identifier expected prior");
-            }
-            else if (argsStart == -1)
-            {
-                throw new ExpectedTokenError("(");
-            }
-            if (argsEnd == -1)
-            {
-                throw new ExpectedTokenError(")");
-            }
-            string identifier = statement[0..statement.IndexOf('(')];
-            int i = Utils.StringIndexOf(identifier, ".");
-            var module = "";
-            if (i != -1 && i < argsStart)
-            {
-                module = identifier[..i];
-                identifier = identifier[(i + 1)..];
-            }
-            if (!Utils.IsIdentifierValid(identifier))
-            {
-                val = null;
-                return false;
-            }
-            if (module != "")
-            {
-                context = (VContext)Evaluator.Evaluate(module, DataType.Module).value;
-            }
-            VClass? class_ = null;
-            if (!ReadVar(identifier, out var func_, context))
-            {
-                throw new UnknownNameError(identifier);
-            }
-            else
-            {
-                if (func_!.type != DataType.Function)
-                {
-                    var f = ((VType_Class)func_).GetCallableFunc() ?? throw new IlegalOperationError($"'{identifier}' is not callable");
-                    class_ = (VClass)func_.value;
-                    func_ = V_Variable.Construct(DataType.Class, func_.value);
-                    func_.value = f;
-                }
-            }
-            if (func_!.value is not VFunc func)
-                throw new InvalidCastException("Function is not a VFunc");
-            string args = statement[(argsStart + 1)..argsEnd];
-            var argsArray = Utils.ArgsEval(args, ',', func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, Utils.StringSplit(args, ',').Length.ToString());
-            if (argsArray.Count != func.Args.Length)
-            {//TODO: defualt params
-                throw new FuncOverloadNotFoundError(func.Identifier, argsArray.Count.ToString());
-            }
-            Dictionary<string, V_Variable> argsList = [];
-            i = 0;
-            foreach (var arg in argsArray)
-            {
-                argsList.Add(func.Args[i].name, arg);
-                i++;
-            }
-            if (func.IsConstructor)
-            {
-                argsList.Add("class_", V_Variable.Construct(DataType.Class, class_));
-            }
-            val = CallFunction(func, argsList);
-            if (itm)
-            {
-                var val_ = val == null || val.value == null ? "none" : val.value;
-                Console.WriteLine("< " + val_.ToString());
-
-            }
-            return true;
+            argsList.Add(func.Args[i].name, arg);
+            i++;
         }
-        val = null;
-        return false;
+        //TODO: handle constructors
+        var val = CallFunction(func, argsList);
+        V_Variable val_ = val == null || val.value == null ? V_Variable.Construct(DataType.None,"") : val;
+        if (itm)
+        {
+            Console.WriteLine("< " + val_.ToString());
+        }
+        return val_;
     }
 
     public static V_Variable? CallFunction(VFunc func, Dictionary<string, V_Variable> args)
@@ -854,6 +685,10 @@ public class Interpreter
         string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
+        if (result)
+            GetCurrentContext().IfState = IfState.passed;
+        else
+            GetCurrentContext().IfState = IfState.failed;
     }
     [MarkStatement(StatementId.StartScope)]
     public void GenericStatementStart(CompiledStatement statement)
@@ -892,6 +727,10 @@ public class Interpreter
         string expression = LexicalAnalyzer.StatementGetExpression(statement);
         bool result = (bool)Evaluator.Evaluate(expression, DataType.Bool).value;
         GetCurrentContext().Ignore = !result;
+        if (result)
+            GetCurrentContext().IfState = IfState.passed;
+        else
+            GetCurrentContext().IfState = IfState.failed;
     }
 
     [MarkStatement(StatementId.Acquire)]
@@ -1087,6 +926,26 @@ public class Interpreter
     {
         Dictionary<string, V_Variable> vars;
         val = null;
+        V_Variable dottable = null!;
+        while (identifier.Contains('.'))
+        {
+            int i = identifier.IndexOf('.');
+            var dottable_ = identifier[..i];
+            if (dottable == null)
+            {
+                dottable = Evaluator.Evaluate(dottable_);
+            }
+            else
+            {
+                dottable = dottable.GetField(dottable_);
+            }
+            identifier = identifier[(i + 1)..];
+        }
+        if (dottable != null)
+        {
+            val = dottable.GetField(identifier);
+            return true;
+        }
         if (context == null)
         {
             //gets all variables in the current frame
@@ -1235,9 +1094,10 @@ public class Interpreter
         return false;
     }
 
-    public static bool DeclareVar(string identifier, V_Variable var)
+    public static bool DeclareVar(string identifier, V_Variable var, VContext? context = null)
     {
-        return GetCurrentContext().Variables.TryAdd(identifier, var);
+        context ??= GetCurrentContext();
+        return context.Variables.TryAdd(identifier, var);
     }
     public static bool DefineFunc(string identifier, VFunc var)
     {
@@ -1254,4 +1114,5 @@ public class Interpreter
         CallStack.Push(frame);
         return frame;
     }
+
 }
