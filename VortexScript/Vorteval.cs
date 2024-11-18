@@ -239,7 +239,7 @@ public class Evaluator
             {
                 var statement = LexicalAnalyzer.TokenizeStatement(tokens[i].value);
                 var result = Interpreter.CallFunctionStatement(statement);
-                tokens[i] = new(DataTypeToTokenType(result.type),"",result.value);
+                tokens[i] = new(DataTypeToTokenType(result.type),result.value.ToString(),result.value);
             }
             else if (tokens[i].type == TokenType.Module && tokens[i].isDot)
             {

@@ -101,6 +101,7 @@ public class ReadingUnsetValueError(params string[] args) : VortexError("The var
 public class IlegalContextDeclarationError(params string[] args) : VortexError("A new {0} may not be declared in the current context.", ErrorType.Syntax, args);
 public class IlegalDeclarationError(params string[] args) : VortexError("{0}", ErrorType.Runtime, args);
 public class FuncOverloadNotFoundError(params string[] args) : VortexError("No overload found for function '{0}' that takes {1} argument(s)", ErrorType.Runtime, args);
+public class FuncSignatureNotFoundError(params string[] args) : VortexError("No function found with this signature: '{0}'", ErrorType.Runtime, args);
 public class InvalidFormatError(params string[] args) : VortexError("Cannot convert '{0}' to {1}", ErrorType.Runtime, args);
 public class StackOverflowError() : VortexError($"The call stack has exceeded the maximum size of {Interpreter.maxDepth} frames", ErrorType.Critical);
 public class FileDoesNotExistError(params string[] args) : VortexError("The file '{0}' does not exist", ErrorType.Critical, args);

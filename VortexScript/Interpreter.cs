@@ -377,7 +377,7 @@ public class Interpreter
                 }
                 if (context.ScopeType == ScopeTypeEnum.classScope)
                 {
-                    var class_ = new VClass(context.Name, context.File!);
+                    var class_ = new VClass(context.Name, context.File!,context.Variables);
                     var var = V_Variable.Construct(DataType.Class, class_);
                     if (!DeclareVar(class_.Identifier, var))
                     {
@@ -499,6 +499,7 @@ public class Interpreter
             if (GetCurrentContext().Name == identifier)
             { //constructor
                 func.IsConstructor = true;
+                func.returnType = DataType.Object;
             }
         }
         var c = OpenNewContext(ScopeTypeEnum.functionScope);
@@ -509,16 +510,40 @@ public class Interpreter
     public static V_Variable CallFunctionStatement(CompiledStatement statement)
     {
         string identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
-        if(!ReadVar(identifier,out var callable)) throw new UnknownNameError(identifier);
-        var func = callable!.GetCallableFunc() ?? throw new IlegalOperationError("The type '"+callable.type+"' is not callable");
         string[] args = LexicalAnalyzer.StatementGetArgs(statement);
-        var argsArray = Utils.ArgsEval(args, func.Args.Select(t => t.enforcedType).ToArray()) ?? throw new FuncOverloadNotFoundError(func.Identifier, args.Length.ToString());
+        var argsArray = Utils.ArgsEval(args);
+        argsArray ??= [];
+        V_Variable? callable = null;
+
+        string signature = identifier + argsArray.Select(x => x.type).Aggregate("", (x, y) => x + " " + y);
+        if (argsArray.Count != 0)
+        {
+            ReadVar(signature, out callable);
+        }
+        else
+        {
+            ReadVar(identifier, out callable);
+        }
+        int i = 0;
+        if (callable == null)
+            for (i = 0; i < argsArray.Count; i++)
+            {
+                var prev = argsArray[i].type;
+                argsArray[i].type = DataType.Any;
+                if (ReadVar(identifier + argsArray.Select(x => x.type).Aggregate("", (x, y) => x + " " + y), out callable)){
+                    argsArray[i].type = prev;
+                    break;
+                }
+                argsArray[i].type = prev;
+            }
+        if(callable==null) throw new FuncSignatureNotFoundError(signature);
+        var func = callable!.GetCallableFunc() ?? throw new IlegalOperationError("The type '" + callable.type + "' is not callable");
         if (argsArray.Count != func.Args.Length)
         {//TODO: defualt params
             throw new FuncOverloadNotFoundError(func.Identifier, argsArray.Count.ToString());
         }
         Dictionary<string, V_Variable> argsList = [];
-        int i = 0;
+        i = 0;
         foreach (var arg in argsArray)
         {
             argsList.Add(func.Args[i].name, arg);
@@ -526,7 +551,7 @@ public class Interpreter
         }
         //TODO: handle constructors
         var val = CallFunction(func, argsList);
-        V_Variable val_ = val == null || val.value == null ? V_Variable.Construct(DataType.None,"") : val;
+        V_Variable val_ = val == null || val.value == null ? V_Variable.Construct(DataType.None, "") : val;
         if (itm)
         {
             Console.WriteLine("< " + val_.ToString());
@@ -888,8 +913,7 @@ public class Interpreter
     [MarkStatement(StatementId.Class)]
     public void ClassStatement(CompiledStatement statement)
     {
-        var identifier = LexicalAnalyzer.StatementGetIdentifier(statement);
-        GetCurrentContext().Ignore = true;
+        var identifier = LexicalAnalyzer.StatementGetDeclareIdentifier(statement);
         GetCurrentContext().Name = identifier;
     }
 
@@ -1103,14 +1127,14 @@ public class Interpreter
     {
         return DeclareVar(identifier, V_Variable.Construct(DataType.Function, var));
     }
-    public static VFrame NewFrame(VFile file, ScopeTypeEnum scopeType, int lineOffset, string name)
+    public static VFrame NewFrame(VFile file, ScopeTypeEnum scopeType, int lineOffset, string name, VContext? context = null)
     {
         if (CallStack.Count == maxDepth)
         {
             throw new StackOverflowError();
         }
         VFrame frame = new(file, lineOffset, name);
-        frame.ScopeStack.Push(new([], file, 0, scopeType, StartLine: GetCurrentFrame().currentLine) { InTryScope = GetCurrentContext().InTryScope });
+        frame.ScopeStack.Push(context?? new([], file, 0, scopeType, StartLine: GetCurrentFrame().currentLine) { InTryScope = GetCurrentContext().InTryScope });
         CallStack.Push(frame);
         return frame;
     }

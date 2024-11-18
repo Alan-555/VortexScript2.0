@@ -366,7 +366,7 @@ public class VType_Object : V_Variable
     }
     public override V_Variable GetField(string identifier)
     {
-        if(!GetClass().InstanceVars.TryGetValue(identifier, out var ret)){
+        if(!GetClass().InstanceVars.TryGetValue(identifier, out var ret)){//TODO: use read var to support function signatures
             throw new UnknownNameError(identifier);
         }
         return ret;

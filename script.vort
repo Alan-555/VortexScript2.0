@@ -1,5 +1,7 @@
-add(Number a, Number b) :
-    < a + b
-;
+class Car :
 
-> add(5,10)
+    $name
+    Car(String a) :
+        name = a
+    ;
+;

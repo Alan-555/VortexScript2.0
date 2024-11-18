@@ -19,7 +19,8 @@ public class VFunc
 
     public VFunc(string indetifier, VFile file, VFuncArg[] args, int startLine)
     {
-        Identifier = indetifier;
+        string signature = args.Select(x=> x.enforcedType.ToString()).Aggregate("",(x,y)=>x+" "+y);
+        Identifier = indetifier+signature;
         File = file;
         Args = args;
         StartLine = startLine;

@@ -7,9 +7,9 @@ public class VClass{
 
     public VFunc Constructor { get; private set; }
 
-    public VClass(string identifier,VFile origin){
+    public VClass(string identifier,VFile origin,Dictionary<string,V_Variable> vars){
         Identifier = identifier;
-        TopLevelContext = new VContext([],origin,scopeType:ScopeTypeEnum.classScope);
+        TopLevelContext = new VContext(vars,origin,scopeType:ScopeTypeEnum.classScope);
 
         Constructor = new VFunc("innerConstruct",TopLevelContext.File!,[],-1){
             CSharpFunc = typeof(VClass).GetMethod("ConstructType"),
