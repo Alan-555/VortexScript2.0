@@ -5,3 +5,5 @@ class Car :
         name = a
     ;
 ;
+
+$x = Car("a")

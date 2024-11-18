@@ -13,8 +13,8 @@ public class Program
         string file;
         if (args.Length == 0)
         {
-            //file = InteractiveTermMode;
-            file = "script.vort";
+            file = InteractiveTermMode;
+            //file = "script.vort";
         }
         else
         {

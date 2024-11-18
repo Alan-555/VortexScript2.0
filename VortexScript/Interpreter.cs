@@ -36,7 +36,8 @@ public class Interpreter
     public static string[] keywords = []; //all reserved keywords are stored here
 
     public static Stack<VFrame> CallStack { get; private set; } = []; //the call stack
-    string[] ITM_Buffer = [];
+    CompiledStatement[] ITM_Buffer = [];
+    public static int BufferDepth = 0;
 
     //Instance    
     public VFile File { private set; get; }
@@ -135,32 +136,57 @@ public class Interpreter
             {
                 if (GetCurrentContext().Depth != 0)
                 {
-                    for (int i = 0; i < GetCurrentContext().Depth; i++)
+                    if (BufferDepth == 0) BufferDepth++;
+                    while (BufferDepth != 0)
                     {
-                        Console.Write("｜");
-                        Console.Write("\t");
-                    }//TODO: remake buffer mode
-                    /*if (Directives.DIR_bufferMode.value)
-                    {
-                        List<string> list = [];
-                        while (true)
+                        for (int i = 0; i < BufferDepth; i++)
                         {
-                            var input = Console.ReadLine()!;
-                            if (input == "endbuffer")
-                                break;
-                            list.Add(input);
+                            Console.Write("｜");
+                            Console.Write("\t");
                         }
-                        ExecuteStatements([.. list]);
-                    }*/
+                        ItmRead();
+                        if (LexicalAnalyzer.GetStatementType(ITM_Buffer.Last().id).StartsNewScope)
+                        {
+                            BufferDepth++;
+                        }
+                        if (LexicalAnalyzer.GetStatementType(ITM_Buffer.Last().id).EndsScope)
+                        {
+                            BufferDepth--;
+                        }
+                    }
+                    ExecuteStatements(ITM_Buffer);
                 }
-                ITM_Buffer = [.. ITM_Buffer, Console.ReadLine()!];
-                ExecuteStatements([LexicalAnalyzer.TokenizeStatement(ITM_Buffer[0])]);
+                else
+                {
+                    ItmRead();
+                    ExecuteStatements(ITM_Buffer);
+
+                }
             }
         }
         else
         {
             var file = File.ReadFile();
             ExecuteStatements([.. file]);
+        }
+    }
+
+    public void ItmRead()
+    {
+        var line = Console.ReadLine()!;
+        try
+        {
+            ITM_Buffer = [.. ITM_Buffer, LexicalAnalyzer.TokenizeStatement(line)];
+        }
+        catch (UnknownStatementError)
+        {
+            Console.WriteLine("> " + Evaluator.Evaluate(line).value.ToString());
+            ITM_Buffer = [.. ITM_Buffer, new(StatementId.PASS, [])];
+        }
+        catch(VortexError e){
+            if(e.type==ErrorType.Syntax){
+                //TODO: error loggining
+            }
         }
     }
 
@@ -243,20 +269,6 @@ public class Interpreter
         }
         try
         {
-
-            //TODO: finish
-            if (itm)
-            {
-                try
-                {
-                    Console.WriteLine("> " + Evaluator.Evaluate(statement));
-                }
-                catch
-                {
-                    //throw new UnknownStatementError(statement.);
-                }
-                return;
-            }
             var statementType = LexicalAnalyzer.GetStatementType(statement.id);
             bool endsScope = statementType.EndsScope;
             bool startsScope = statementType.StartsNewScope;
@@ -377,7 +389,7 @@ public class Interpreter
                 }
                 if (context.ScopeType == ScopeTypeEnum.classScope)
                 {
-                    var class_ = new VClass(context.Name, context.File!,context.Variables);
+                    var class_ = new VClass(context.Name, context.File!, context.Variables);
                     var var = V_Variable.Construct(DataType.Class, class_);
                     if (!DeclareVar(class_.Identifier, var))
                     {
@@ -530,13 +542,14 @@ public class Interpreter
             {
                 var prev = argsArray[i].type;
                 argsArray[i].type = DataType.Any;
-                if (ReadVar(identifier + argsArray.Select(x => x.type).Aggregate("", (x, y) => x + " " + y), out callable)){
+                if (ReadVar(identifier + argsArray.Select(x => x.type).Aggregate("", (x, y) => x + " " + y), out callable))
+                {
                     argsArray[i].type = prev;
                     break;
                 }
                 argsArray[i].type = prev;
             }
-        if(callable==null) throw new FuncSignatureNotFoundError(signature);
+        if (callable == null) throw new FuncSignatureNotFoundError(signature);
         var func = callable!.GetCallableFunc() ?? throw new IlegalOperationError("The type '" + callable.type + "' is not callable");
         if (argsArray.Count != func.Args.Length)
         {//TODO: defualt params
@@ -1134,7 +1147,7 @@ public class Interpreter
             throw new StackOverflowError();
         }
         VFrame frame = new(file, lineOffset, name);
-        frame.ScopeStack.Push(context?? new([], file, 0, scopeType, StartLine: GetCurrentFrame().currentLine) { InTryScope = GetCurrentContext().InTryScope });
+        frame.ScopeStack.Push(context ?? new([], file, 0, scopeType, StartLine: GetCurrentFrame().currentLine) { InTryScope = GetCurrentContext().InTryScope });
         CallStack.Push(frame);
         return frame;
     }
