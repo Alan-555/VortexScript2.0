@@ -144,7 +144,14 @@ public class Interpreter
                             Console.Write("｜");
                             Console.Write("\t");
                         }
-                        ItmRead();
+                        try{
+                            ItmRead();
+                        }
+                        catch(VortexError e){
+                            if(e.type == ErrorType.Syntax)
+                                continue;
+                            throw;
+                        }
                         if (LexicalAnalyzer.GetStatementType(ITM_Buffer.Last().id).StartsNewScope)
                         {
                             BufferDepth++;
@@ -158,7 +165,12 @@ public class Interpreter
                 }
                 else
                 {
-                    ItmRead();
+                    try{
+                        ItmRead();
+                    }catch(VortexError e){
+                        if(e.type == ErrorType.Syntax)continue;
+                        throw;
+                    }
                     ExecuteStatements(ITM_Buffer);
 
                 }
@@ -183,10 +195,8 @@ public class Interpreter
             Console.WriteLine("> " + Evaluator.Evaluate(line).value.ToString());
             ITM_Buffer = [.. ITM_Buffer, new(StatementId.PASS, [])];
         }
-        catch(VortexError e){
-            if(e.type==ErrorType.Syntax){
-                //TODO: error loggining
-            }
+        catch(VortexError){
+            throw;
         }
     }
 

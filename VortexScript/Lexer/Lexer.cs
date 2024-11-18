@@ -62,6 +62,7 @@ public class LexicalAnalyzer
     {
         List<CompiledToken> ret = [];
         string current = statement;
+        int totalLen = 0;
         //iterate through each token in the statement
         foreach (var item in type.statementStruct)
         {
@@ -80,7 +81,7 @@ public class LexicalAnalyzer
                     //and the token is mandatory-then throw an error
                     if (item.mandatory)
                     {
-                        throw new ExpectedTokenError(token.TypeToString());
+                        RaiseSyntaxError(new ExpectedTokenError(token.TypeToString()),statement,type,current.Length,token);
                     }
                     //else break and proceed to groupCount eval
                     else
@@ -110,17 +111,17 @@ public class LexicalAnalyzer
                         var dict = new Dictionary<string, string>();
                         for(int ii = 0; ii < arr.Length; ii++){
                             var arr_ = arr[ii].Split(' ');
-                            if(arr_.Length == 1){
+                            if(arr_.Length == 1){//TODO: fix out of bound expc
                                 Utils.IsIdentifierValid(arr_[ii],true,true);
                                 if(dict.ContainsKey(arr_[ii]))
-                                    throw new DuplicateVariableError(arr_[ii]);
+                                    RaiseSyntaxError(new DuplicateVariableError(arr_[ii]),statement,type,current.Length,token);
                                 dict.Add(arr_[ii],"Any");
 
                             }
                             else{
                                 Utils.IsIdentifierValid(arr_[ii+1],true,true);
                                 if(dict.ContainsKey(arr_[ii+1]))
-                                    throw new DuplicateVariableError(arr_[ii+1]);
+                                    RaiseSyntaxError(new DuplicateVariableError(arr_[ii+1]),statement,type,current.Length,token);
                                 dict.Add(arr_[ii+1],arr_[ii]);
                             }
                         }
@@ -145,10 +146,10 @@ public class LexicalAnalyzer
                     {
                         if (lastPresentIndex == -1)
                         {
-                            throw new ExpectedTokenError(item.tokens[0].TypeToString());
+                            RaiseSyntaxError(new ExpectedTokenError(item.tokens[0].TypeToString()),statement,type,current.Length,null);
                         }
                         var missingToken = item.tokens[lastPresentIndex];
-                        throw new ExpectedTokenError(missingToken.TypeToString());
+                        RaiseSyntaxError(new ExpectedTokenError(missingToken.TypeToString()),statement,type,current.Length,null);
                     }
 
                 }
@@ -158,15 +159,15 @@ public class LexicalAnalyzer
                     {
                         if (lastPresentIndex == -1)
                         {
-                            throw new UnexpectedTokenError(item.tokens[0].TypeToString());
+                            RaiseSyntaxError(new UnexpectedTokenError(item.tokens[0].TypeToString()),statement,type,current.Length,null);
                         }
                         var missingToken = item.tokens[lastPresentIndex];
-                        throw new UnexpectedTokenError(missingToken.TypeToString());
+                        RaiseSyntaxError(new UnexpectedTokenError(missingToken.TypeToString()),statement,type,current.Length,null);
                     }
                 }
                 if (groupCount == 0)
                 {
-                    throw new ExpectedTokenError(item.tokens[0].TypeToString());
+                    RaiseSyntaxError(new ExpectedTokenError(item.tokens[0].TypeToString()),statement,type,current.Length,null);
                 }
             }
             else
@@ -180,10 +181,10 @@ public class LexicalAnalyzer
                         {
                             if (lastPresentIndex == -1)
                             {
-                                throw new ExpectedTokenError(item.tokens[0].TypeToString());
+                                RaiseSyntaxError(new ExpectedTokenError(item.tokens[0].TypeToString()),statement,type,current.Length,null);
                             }
                             var missingToken = item.tokens[lastPresentIndex];
-                            throw new ExpectedTokenError(missingToken.TypeToString());
+                            RaiseSyntaxError(new ExpectedTokenError(missingToken.TypeToString()),statement,type,current.Length,null);
                         }
 
                     }
@@ -193,17 +194,17 @@ public class LexicalAnalyzer
                         {
                             if (lastPresentIndex == -1)
                             {
-                                throw new UnexpectedTokenError(item.tokens[0].TypeToString());
+                                RaiseSyntaxError(new UnexpectedTokenError(item.tokens[0].TypeToString()),statement,type,current.Length,null);
                             }
                             var missingToken = item.tokens[lastPresentIndex];
-                            throw new UnexpectedTokenError(missingToken.TypeToString());
+                            RaiseSyntaxError(new UnexpectedTokenError(missingToken.TypeToString()),statement,type,current.Length,null);
                         }
                     }
                 }
             }
         }
         //if there is still something in statement we are not expecting it
-        if (current != "") throw new UnexpectedTokenError(current);
+        if (current != "") RaiseSyntaxError(new UnexpectedTokenError(current),statement,type,current.Length,null);;
         return new(type.Id,[.. ret]);
     }
 
@@ -281,6 +282,16 @@ public class LexicalAnalyzer
         return i;
     }
 
+    public static void RaiseSyntaxError(VortexError error, string originalStatement,StatementType statementType, int pos, LexerToken? token){
+        if(error.type!=ErrorType.Syntax) throw new ArgumentException("Expected syntax error");
+        VortexError.ThrowError(error,false);
+        Console.WriteLine(originalStatement);
+        for(int i = 0; i < originalStatement.Length- pos;i++){
+            Console.Write(" ");
+        }
+        Console.WriteLine("↑ here");
+        throw error;
+    }
 
     public static bool StatementContainsSyntax(CompiledStatement statement,string syntax){
         foreach (var item in statement.tokens)

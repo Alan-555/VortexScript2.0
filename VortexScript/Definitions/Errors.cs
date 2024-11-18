@@ -51,7 +51,7 @@ public class VortexError : Exception
         return GetType().ToString().Replace("Vortex.", "") + message + "\t" + info;
     }
 
-    public static void ThrowError(VortexError error)
+    public static void ThrowError(VortexError error,bool verbose = true)
     {
         Console.WriteLine("Error: ");
         Console.Write(error.GetType().Name + " has been raised: ");
@@ -60,6 +60,7 @@ public class VortexError : Exception
         {
             Console.WriteLine("\t" + val);
         }
+        if(!verbose)return;
         Console.WriteLine("In: " + Interpreter.GetCurrentFrame().VFile.Path + ":" + (Interpreter.GetCurrentFrame().currentLine + 1+Interpreter.GetCurrentFrame().LineOffset));
         Console.WriteLine("\nListing frames:");
         int lastLine = 0;
